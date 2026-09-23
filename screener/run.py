@@ -40,6 +40,7 @@ def main() -> None:
     ap.add_argument("--min-buy", type=float, default=300, help="오늘 연기금 순매수 하한 (백만원)")
     ap.add_argument("--lookback", type=int, default=20, help="침묵 판단 기간 (거래일)")
     ap.add_argument("--quiet-max", type=float, default=30, help="침묵 기간 중 일별 |순매수| 상한 (백만원)")
+    ap.add_argument("--show", type=int, default=15, help="진단 표에 보여줄 후보 수")
     args = ap.parse_args()
 
     now = datetime.now()
@@ -54,7 +55,7 @@ def main() -> None:
     candidates.sort(key=lambda r: num(r["netprps_amt"]), reverse=True)
     print(f"오늘 순매수 >= {args.min_buy:.0f}백만원 후보: {len(candidates)} 종목\n")
 
-    signals, history = [], {}
+    rows, history = [], {}
     for r in candidates:
         daily = api.daily_investor(r["stk_cd"], today)
         past = [d for d in daily if d["dt"] < today][: args.lookback]
@@ -63,35 +64,42 @@ def main() -> None:
             continue  # 상장 직후 등 이력 부족
         past_flow = [num(d["penfnd_etc"]) for d in past]
         past_max = max(abs(x) for x in past_flow)
-        if past_max > args.quiet_max:
-            continue
         today_buy = num(r["netprps_amt"])
-        signals.append({
+        rows.append({
+            "신호": past_max <= args.quiet_max,
             "종목코드": r["stk_cd"],
             "종목명": r["stk_nm"],
-            "현재가": num(r["cur_prc"]),
             "등락률": num(r["flu_rt"]),
-            "오늘_연기금순매수(억)": round(today_buy / 100, 2),
-            "직전증감(억)": round(num(r["netprps_amt_irds"]) / 100, 2),
-            f"과거{args.lookback}일_최대절댓값(억)": round(past_max / 100, 2),
-            f"과거{args.lookback}일_매매일수": sum(1 for x in past_flow if x != 0),
+            "오늘순매수(억)": round(today_buy / 100, 1),
+            "직전증감(억)": round(num(r["netprps_amt_irds"]) / 100, 1),
+            "과거최대|x|(억)": round(past_max / 100, 2),
+            "과거매매일수": sum(1 for x in past_flow if x != 0),
+            "기준초과일수": sum(1 for x in past_flow if abs(x) > args.quiet_max),
+            "급증배수": round(today_buy / max(past_max, 1), 1),
         })
+    # 조용했던 순서 (과거 최대 절댓값 오름차순)
+    rows.sort(key=lambda x: (x["과거최대|x|(억)"], -x["오늘순매수(억)"]))
 
     OUT_DIR.mkdir(exist_ok=True)
     stamp = now.strftime("%Y%m%d_%H%M")
     (OUT_DIR / f"raw_{stamp}.json").write_text(
         json.dumps({"intraday": intraday, "history": history}, ensure_ascii=False))
-    if not signals:
-        print("신호 없음 (조건을 완화해 보세요: --quiet-max, --min-buy)")
-        return
-    out = OUT_DIR / f"signals_{stamp}.csv"
-    with out.open("w", newline="", encoding="utf-8-sig") as f:
-        w = csv.DictWriter(f, fieldnames=list(signals[0].keys()))
-        w.writeheader()
-        w.writerows(signals)
-    print(f"🔔 신호 {len(signals)} 종목  -> {out}")
-    for s in signals:
-        print("  " + "  ".join(f"{k}={v}" for k, v in s.items()))
+    if rows:
+        out = OUT_DIR / f"candidates_{stamp}.csv"
+        with out.open("w", newline="", encoding="utf-8-sig") as f:
+            w = csv.DictWriter(f, fieldnames=list(rows[0].keys()))
+            w.writeheader()
+            w.writerows(rows)
+        print(f"후보 전체 -> {out}")
+
+    signals = [x for x in rows if x["신호"]]
+    print(f"\n🔔 신호 {len(signals)} 종목 (과거 {args.lookback}일 매일 |순매수| <= {args.quiet_max / 100:g}억)")
+    print(f"\n가장 조용했던 후보 상위 {args.show} (과거 {args.lookback}일 기준)")
+    cols = [c for c in rows[0].keys() if c != "신호"] if rows else []
+    print("    " + " | ".join(cols))
+    for x in rows[: args.show]:
+        mark = "✅" if x["신호"] else "  "
+        print(f"{mark}  " + " | ".join(str(x[c]) for c in cols))
 
 
 if __name__ == "__main__":
