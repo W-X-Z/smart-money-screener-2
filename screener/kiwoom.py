@@ -107,8 +107,33 @@ class Kiwoom:
             "trde_tp": "1", "mrkt_tp": mrkt_tp, "orgn_tp": "6000",
         }, "opmr_invsr_trde_upper")
 
-    def daily_investor(self, stk_cd: str, dt: str) -> List[Dict]:
-        """ka10059 종목별투자자기관별 - dt 부터 과거로 일별 100행. 금액 단위 백만원."""
+    def daily_investor(self, stk_cd: str, dt: str, pages: int = 1) -> List[Dict]:
+        """ka10059 종목별투자자기관별 - dt 부터 과거로 일별 (페이지당 100행). 금액 단위 백만원."""
         return self.call("/api/dostk/stkinfo", "ka10059", {
             "dt": dt, "stk_cd": stk_cd, "amt_qty_tp": "1", "trde_tp": "0", "unit_tp": "1000",
-        }, "stk_invsr_orgn")
+        }, "stk_invsr_orgn", max_pages=pages)
+
+    def stock_list(self, mrkt_tp: str) -> List[Dict]:
+        """ka10099 종목정보 리스트 (mrkt_tp: 0 코스피, 10 코스닥). 응답 목록 키를 자동으로 찾는다."""
+        assert "/api/dostk/stkinfo" in ALLOWED_PATHS
+        resp = requests.post(
+            f"{BASE_URL}/api/dostk/stkinfo",
+            json={"mrkt_tp": mrkt_tp},
+            headers={
+                "Content-Type": "application/json;charset=UTF-8",
+                "authorization": f"Bearer {self.token}",
+                "api-id": "ka10099", "cont-yn": "N", "next-key": "",
+            },
+            timeout=30,
+        )
+        data = resp.json()
+        if data.get("return_code") != 0:
+            raise RuntimeError(f"ka10099 실패: {data.get('return_code')} {data.get('return_msg')}")
+        rows = next((v for v in data.values() if isinstance(v, list)), [])
+        out = []
+        for r in rows:
+            code = r.get("code") or r.get("stk_cd")
+            name = r.get("name") or r.get("stk_nm") or ""
+            if code:
+                out.append({"stk_cd": code, "stk_nm": name, "raw": r})
+        return out

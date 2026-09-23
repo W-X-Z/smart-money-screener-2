@@ -55,11 +55,14 @@ def main() -> None:
     candidates.sort(key=lambda r: num(r["netprps_amt"]), reverse=True)
     print(f"오늘 순매수 >= {args.min_buy:.0f}백만원 후보: {len(candidates)} 종목\n")
 
-    rows, history = [], {}
+    rows, history, unit_check = [], {}, []
     for r in candidates:
         daily = api.daily_investor(r["stk_cd"], today)
         past = [d for d in daily if d["dt"] < today][: args.lookback]
         history[r["stk_cd"]] = daily
+        today_row = next((d for d in daily if d["dt"] == today), None)
+        if today_row and num(today_row["penfnd_etc"]):
+            unit_check.append(num(today_row["penfnd_etc"]) / num(r["netprps_amt"]))
         if len(past) < args.lookback:
             continue  # 상장 직후 등 이력 부족
         past_flow = [num(d["penfnd_etc"]) for d in past]
@@ -77,6 +80,10 @@ def main() -> None:
             "기준초과일수": sum(1 for x in past_flow if abs(x) > args.quiet_max),
             "급증배수": round(today_buy / max(past_max, 1), 1),
         })
+    if unit_check:
+        unit_check.sort()
+        print(f"[검증] 일별(ka10059) 오늘값 / 장중(ka10063) 비율 중앙값: {unit_check[len(unit_check) // 2]:.2f} "
+              f"({len(unit_check)}종목, 장 마감 후 1.0 근처면 단위 일치)")
     # 조용했던 순서 (과거 최대 절댓값 오름차순)
     rows.sort(key=lambda x: (x["과거최대|x|(억)"], -x["오늘순매수(억)"]))
 
