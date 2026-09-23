@@ -1,6 +1,7 @@
 """키움 REST API 최소 클라이언트 (시세 조회 전용)."""
 
 import os
+import re
 import sys
 import threading
 import time
@@ -16,6 +17,13 @@ ROOT = Path(__file__).resolve().parent.parent
 ALLOWED_PATHS = {"/api/dostk/stkinfo", "/api/dostk/mrkcond", "/api/dostk/rkinfo", "/api/dostk/frgnistt"}
 CALL_INTERVAL = 0.2  # 전체 호출 간격 (초당 5회). 스레드 간 공유
 RETRIES = 3
+
+# ETF·ETN·스팩 등 일반 기업이 아닌 종목 (이름 기준)
+NON_STOCK = re.compile(
+    r"ETN|ETF|스팩|KODEX|TIGER|KBSTAR|RISE |ACE |SOL |HANARO|KOSEF|ARIRANG|PLUS |TIMEFOLIO|KIWOOM |"
+    r"WON |BNK |FOCUS|TRUSTON|마이다스|파워 |히어로즈|UNICORN|VITA|1Q |에셋플러스|DAISHIN|KCGI|"
+    r"레버리지|인버스|선물|채권|국채|머니마켓|액티브|합성|H\)|\(H\)"
+)
 
 
 def load_env() -> None:

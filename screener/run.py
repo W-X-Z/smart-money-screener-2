@@ -16,7 +16,7 @@ import json
 from datetime import datetime
 from pathlib import Path
 
-from screener.kiwoom import ROOT, Kiwoom, num
+from screener.kiwoom import NON_STOCK, ROOT, Kiwoom, num
 
 OUT_DIR = ROOT / "output"
 PENSION_INVSR = "3"  # ka10063 투자자 구분 중 연기금으로 추정되는 코드 (verify_pension_code 로 확인)
@@ -51,7 +51,8 @@ def main() -> None:
     print(f"장중 연기금 잠정 데이터: {len(intraday)} 종목")
     verify_pension_code(api, intraday)
 
-    candidates = [r for r in intraday if num(r["netprps_amt"]) >= args.min_buy]
+    candidates = [r for r in intraday
+                  if num(r["netprps_amt"]) >= args.min_buy and not NON_STOCK.search(r["stk_nm"])]
     candidates.sort(key=lambda r: num(r["netprps_amt"]), reverse=True)
     print(f"오늘 순매수 >= {args.min_buy:.0f}백만원 후보: {len(candidates)} 종목\n")
 

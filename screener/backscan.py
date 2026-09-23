@@ -18,14 +18,13 @@
 import argparse
 import csv
 import json
-import re
 import statistics
 from collections import Counter, defaultdict
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import date
 from itertools import product
 
-from screener.kiwoom import ROOT, Kiwoom, num
+from screener.kiwoom import NON_STOCK, ROOT, Kiwoom, num
 
 OUT_DIR = ROOT / "output"
 CACHE_DIR = OUT_DIR / "cache"
@@ -36,12 +35,6 @@ GRID_MIN_BUY = (100, 300, 500, 1000)   # 신호일 연기금 순매수 하한 (�
 GRID_QUIET_MAX = (10, 30, 100)         # 침묵 기간 일별 |순매수| 상한 (백만원)
 GRID_LOOKBACK = (10, 20, 40)           # 침묵 기간 (거래일)
 
-# ETF·ETN·스팩 등 일반 기업이 아닌 종목 (이름 기준)
-NON_STOCK = re.compile(
-    r"ETN|ETF|스팩|KODEX|TIGER|KBSTAR|RISE |ACE |SOL |HANARO|KOSEF|ARIRANG|PLUS |TIMEFOLIO|KIWOOM |"
-    r"WON |BNK |FOCUS|TRUSTON|마이다스|파워 |히어로즈|UNICORN|VITA|1Q |에셋플러스|DAISHIN|KCGI|"
-    r"레버리지|인버스|선물|채권|국채|머니마켓|액티브|합성|H\)|\(H\)"
-)
 
 
 def build_universe(api: Kiwoom, limit: int):
