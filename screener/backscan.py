@@ -51,6 +51,9 @@ def build_universe(api: Kiwoom, limit: int):
         (CACHE_DIR / f"universe_{mrkt}.json").write_text(
             json.dumps([s["raw"] for s in raw], ensure_ascii=False))
         stocks = [s for s in raw if not NON_STOCK.search(s["stk_nm"])]
+        for st in stocks:
+            st["market"] = "코스피" if mrkt == "0" else "코스닥"
+            st["size"] = st["raw"].get("upSizeName") or "미분류"
         for field in ("marketName", "kind", "upSizeName"):
             counts = Counter(str(s["raw"].get(field)) for s in stocks).most_common(6)
             print(f"  시장 {mrkt} {field}: {counts}")
@@ -119,10 +122,59 @@ def summarize(events, n_days):
     return out
 
 
+def _stats(events, h=20):
+    x = [e[f"x{h}"] for e in events if e[f"x{h}"] is not None]
+    x5 = [e["x5"] for e in events if e["x5"] is not None]
+    if not x:
+        return f"n={len(events)}"
+    return (f"n={len(x):3d}  x5중앙={statistics.median(x5) if x5 else 0:6.2f}  "
+            f"x{h}평균={statistics.mean(x):6.2f}  x{h}중앙={statistics.median(x):6.2f}  "
+            f"승률={sum(v > 0 for v in x) / len(x) * 100:3.0f}%")
+
+
+def robustness(events, meta):
+    """기본 조합 신호가 특정 시장·규모·기간·날짜·종목에 쏠려 있는지 확인."""
+    print(f"\n=== 견고성 점검 ({len(events)}건) ===")
+    groups = [
+        ("시장", lambda e: meta[e["종목코드"]]["market"]),
+        ("규모", lambda e: meta[e["종목코드"]]["size"]),
+        ("월", lambda e: e["신호일"][:6]),
+    ]
+    for label, key in groups:
+        print(f"[{label}별]")
+        buckets = defaultdict(list)
+        for e in events:
+            buckets[key(e)].append(e)
+        for k in sorted(buckets):
+            print(f"  {k:8s} {_stats(buckets[k])}")
+
+    dates = sorted(e["신호일"] for e in events)
+    if dates:
+        mid = dates[len(dates) // 2]
+        print("[전반/후반]")
+        print(f"  ~{mid}  {_stats([e for e in events if e['신호일'] < mid])}")
+        print(f"  {mid}~  {_stats([e for e in events if e['신호일'] >= mid])}")
+
+    top_dates = Counter(dates).most_common(5)
+    print(f"[신호 많은 날짜] {top_dates}  (한 날짜 쏠림 = 지수 리밸런싱 등 의심)")
+    repeat = Counter(e["종목코드"] for e in events)
+    print(f"[종목 중복] 고유 종목 {len(repeat)}개, 2회 이상 신호 {sum(1 for v in repeat.values() if v > 1)}개")
+
+    x = sorted((e for e in events if e["x20"] is not None), key=lambda e: e["x20"])
+    if len(x) >= 20:
+        cut = max(len(x) // 20, 1)
+        trimmed = [e["x20"] for e in x[cut:-cut]]
+        print(f"[이상치] x20 상하위 5% 제외 평균 {statistics.mean(trimmed):.2f}% "
+              f"(전체 평균 {statistics.mean(e['x20'] for e in x):.2f}%)")
+        print("  상위 5: " + ", ".join(f"{e['종목명']}({e['신호일']}) {e['x20']:+.1f}%" for e in x[-5:][::-1]))
+        print("  하위 5: " + ", ".join(f"{e['종목명']}({e['신호일']}) {e['x20']:+.1f}%" for e in x[:5]))
+
+
 def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("--limit", type=int, default=0, help="시장별 앞에서 N종목만 (테스트용)")
     ap.add_argument("--pages", type=int, default=2, help="종목당 조회 페이지 (1페이지=100거래일)")
+    ap.add_argument("--focus", default="300,30,20", help="견고성 점검할 조합 min_buy,quiet_max,lookback (백만원)")
     args = ap.parse_args()
 
     today = date.today().strftime("%Y%m%d")
@@ -130,6 +182,7 @@ def main() -> None:
     api = Kiwoom()
     universe = build_universe(api, args.limit)
 
+    meta = {s["stk_cd"]: s for s in universe}
     series, done = {}, 0
     with ThreadPoolExecutor(WORKERS) as pool:
         futures = {pool.submit(load_series, api, s["stk_cd"], today, args.pages): s for s in universe}
@@ -180,6 +233,9 @@ def main() -> None:
     for g in grid:
         if g["신호수"]:
             print(" | ".join(str(g[c]) for c in cols))
+    focus = tuple(int(v) for v in args.focus.split(","))
+    if focus in all_events:
+        robustness(all_events[focus], meta)
     print(f"\n그리드 -> {grid_path}")
     print(f"신호 목록 (모든 조합 합집합) -> {ev_path} ({len(merged)}건)")
 
