@@ -25,6 +25,23 @@ python -m screener.run --min-buy 300 --lookback 20 --quiet-max 30
 
 결과: `output/signals_YYYYMMDD_HHMM.csv`, 원본 응답 `output/raw_*.json`.
 
+## 웹 UI
+
+배포 주소: **https://smart-money-pension.web.app** — 시그널 목록(최신 신호일 순), 종목 클릭 시 연기금 일별 순매수·종가 추이.
+
+키움 API 는 Mac 에서만 호출되므로, Mac 이 결과를 Firestore 에 올리고 배포 웹이 그것을 읽습니다.
+
+```bash
+# .env 에 FIREBASE_SERVICE_ACCOUNT=<서비스 계정 JSON 경로> 추가 후
+python -m screener.backfill            # 받아 둔 일별 캐시에서 과거 시그널 저장 (최초 1회)
+python -m screener.publish             # 시그널 + 종목별 수급을 Firestore 에 업로드
+python -m screener.run --publish       # 장중 스캔 후 바로 업로드
+```
+
+로컬에서만 보려면 `python -m screener.web` (http://localhost:8000, 키움에서 직접 조회).
+
+웹·규칙 재배포: `python tools/deploy_firebase.py` (`firebase/firestore.rules`, `web/`). 기존 기본 사이트는 건드리지 않습니다.
+
 ## 과거 검증 (backscan)
 
 과거 일별 연기금 수급(ka10059, 약 200거래일)으로 기준값별 신호 빈도와 이후 수익률을 계산합니다.

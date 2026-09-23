@@ -1,0 +1,373 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>연기금 시그널</title>
+<link rel="icon" href="data:,">
+<style>
+:root {
+  --bg: #f6f6f4;
+  --surface: #fcfcfb;
+  --border: #e4e3df;
+  --grid: #ecebe7;
+  --text-primary: #0b0b0b;
+  --text-secondary: #52514e;
+  --text-muted: #7a7974;
+  --buy: #e34948;
+  --sell: #2a78d6;
+  --line: #52514e;
+  --accent-bg: #fdeeee;
+  --hover: #f1f0ec;
+}
+@media (prefers-color-scheme: dark) {
+  :root:where(:not([data-theme="light"])) {
+    --bg: #121211;
+    --surface: #1a1a19;
+    --border: #2e2e2c;
+    --grid: #262624;
+    --text-primary: #ffffff;
+    --text-secondary: #c3c2b7;
+    --text-muted: #8f8e86;
+    --buy: #e66767;
+    --sell: #3987e5;
+    --line: #c3c2b7;
+    --accent-bg: #3a2222;
+    --hover: #232322;
+    color-scheme: dark;
+  }
+}
+* { box-sizing: border-box; }
+body {
+  margin: 0; background: var(--bg); color: var(--text-primary);
+  font: 14px/1.5 -apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo", "Pretendard", "Segoe UI", sans-serif;
+}
+header { padding: 20px 24px 8px; max-width: 1080px; margin: 0 auto; }
+h1 { font-size: 20px; margin: 0 0 4px; }
+.sub { color: var(--text-secondary); margin: 0; }
+main { max-width: 1080px; margin: 0 auto; padding: 8px 24px 40px; }
+.toolbar { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; margin: 12px 0; color: var(--text-secondary); }
+.toolbar input { padding: 6px 10px; border: 1px solid var(--border); border-radius: 6px; background: var(--surface); color: var(--text-primary); min-width: 200px; }
+.card { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; overflow: hidden; }
+table { width: 100%; border-collapse: collapse; }
+th, td { padding: 9px 12px; text-align: left; border-bottom: 1px solid var(--border); white-space: nowrap; }
+th { font-weight: 600; color: var(--text-secondary); font-size: 12px; background: var(--surface); position: sticky; top: 0; }
+td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
+tr.date-row td { background: var(--bg); font-weight: 600; color: var(--text-secondary); font-size: 12px; padding: 6px 12px; }
+tr.sig { cursor: pointer; }
+tr.sig:hover td, tr.sig:focus td { background: var(--hover); outline: none; }
+.name { font-weight: 600; }
+.code { color: var(--text-muted); margin-left: 6px; font-size: 12px; }
+.tag { display: inline-block; padding: 1px 8px; border-radius: 999px; font-size: 11px; border: 1px solid var(--border); color: var(--text-secondary); }
+.tag.live { border-color: var(--buy); color: var(--buy); }
+.buy { color: var(--text-primary); font-weight: 600; }
+.empty { padding: 40px; text-align: center; color: var(--text-secondary); }
+.table-wrap { overflow-x: auto; }
+
+/* modal */
+.backdrop { position: fixed; inset: 0; background: rgba(0,0,0,.45); display: none; align-items: center; justify-content: center; padding: 16px; z-index: 10; }
+.backdrop.open { display: flex; }
+.modal { background: var(--surface); border-radius: 12px; width: min(960px, 100%); max-height: 92vh; overflow: auto; padding: 20px 24px; position: relative; }
+.modal h2 { margin: 0; font-size: 18px; }
+.modal .meta { color: var(--text-secondary); margin: 4px 0 12px; }
+.close { position: absolute; top: 12px; right: 12px; border: none; background: none; font-size: 22px; cursor: pointer; color: var(--text-secondary); line-height: 1; padding: 6px; }
+.chart-title { font-size: 13px; font-weight: 600; margin: 14px 0 2px; color: var(--text-primary); }
+.chart-note { font-size: 12px; color: var(--text-muted); margin: 0 0 4px; }
+.legend { display: flex; gap: 14px; font-size: 12px; color: var(--text-secondary); margin: 2px 0 4px; }
+.legend i { display: inline-block; width: 10px; height: 10px; border-radius: 2px; margin-right: 5px; vertical-align: -1px; }
+.chart { position: relative; }
+svg { display: block; width: 100%; overflow: visible; }
+svg text { fill: var(--text-muted); font-size: 11px; }
+.tooltip { position: absolute; pointer-events: none; background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 8px 10px; font-size: 12px; box-shadow: 0 4px 16px rgba(0,0,0,.12); display: none; white-space: nowrap; z-index: 2; }
+.tooltip b { color: var(--text-primary); }
+.tooltip .row { color: var(--text-secondary); }
+.toggle { margin-top: 12px; background: none; border: 1px solid var(--border); color: var(--text-secondary); border-radius: 6px; padding: 5px 10px; cursor: pointer; }
+.data-table { margin-top: 8px; max-height: 260px; overflow: auto; border: 1px solid var(--border); border-radius: 8px; display: none; }
+.data-table.open { display: block; }
+.data-table td, .data-table th { padding: 5px 10px; font-size: 12px; }
+.status { color: var(--text-secondary); padding: 40px 0; text-align: center; }
+@media (max-width: 640px) {
+  header, main { padding-left: 16px; padding-right: 16px; }
+  .hide-sm { display: none; }
+  .modal { padding: 16px; }
+}
+</style>
+</head>
+<body>
+<header>
+  <h1>연기금 시그널</h1>
+  <p class="sub">연기금 매매가 0에 가깝다가 갑자기 대규모 순매수가 들어온 종목 · 최신 신호일 순<span id="updated"></span></p>
+</header>
+<main>
+  <div class="toolbar">
+    <input id="q" type="search" placeholder="종목명 또는 코드 검색" aria-label="종목 검색">
+    <span id="count"></span>
+  </div>
+  <div class="card table-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th>종목</th>
+          <th class="hide-sm">시장</th>
+          <th class="num">연기금 순매수</th>
+          <th class="num hide-sm">직전 최대 |순매수|</th>
+          <th class="num hide-sm">직전 매매일수</th>
+          <th>구분</th>
+        </tr>
+      </thead>
+      <tbody id="rows"><tr><td colspan="6" class="empty">불러오는 중…</td></tr></tbody>
+    </table>
+  </div>
+</main>
+
+<div class="backdrop" id="backdrop" role="dialog" aria-modal="true" aria-labelledby="m-title">
+  <div class="modal">
+    <button class="close" id="close" aria-label="닫기">×</button>
+    <h2 id="m-title"></h2>
+    <div class="meta" id="m-meta"></div>
+    <div id="m-body"></div>
+  </div>
+</div>
+
+<script>
+const $ = (s) => document.querySelector(s);
+const fmtDate = (d) => `${d.slice(0, 4)}-${d.slice(4, 6)}-${d.slice(6, 8)}`;
+const fmtEok = (v) => `${v > 0 ? "+" : ""}${v.toFixed(1)}억`;
+const fmtWon = (v) => `${Math.round(v).toLocaleString("ko-KR")}원`;
+const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+let SIGNALS = [];
+
+// 로컬(python -m screener.web)에서는 로컬 API, 배포 사이트에서는 Firestore 를 읽는다
+const LOCAL = ["localhost", "127.0.0.1"].includes(location.hostname);
+const FS = "https://firestore.googleapis.com/v1/projects/smart-money-screener/databases/(default)/documents";
+
+async function fsDoc(path) {
+  const res = await fetch(`${FS}/${path}`);
+  if (res.status === 404) return null;
+  if (!res.ok) throw new Error(`Firestore ${res.status}`);
+  const f = (await res.json()).fields || {};
+  return { data: JSON.parse(f.json.stringValue), updatedAt: f.updated_at && f.updated_at.stringValue };
+}
+
+async function getSignals() {
+  if (LOCAL) return (await fetch("/api/signals")).json();
+  const doc = await fsDoc("pension_signals/latest");
+  if (doc && doc.updatedAt) $("#updated").textContent = ` · 업데이트 ${doc.updatedAt}`;
+  return doc ? doc.data : [];
+}
+
+async function getFlow(code) {
+  if (LOCAL) {
+    const res = await fetch(`/api/flow?code=${encodeURIComponent(code)}`);
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || res.statusText);
+    return data.rows;
+  }
+  const doc = await fsDoc(`pension_flow/${encodeURIComponent(code)}`);
+  if (!doc) throw new Error("이 종목의 수급 데이터가 아직 업로드되지 않았습니다");
+  return doc.data;
+}
+
+async function loadSignals() {
+  SIGNALS = await getSignals();
+  renderList();
+}
+
+function renderList() {
+  const q = $("#q").value.trim().toLowerCase();
+  const list = SIGNALS.filter((s) => !q || s.name.toLowerCase().includes(q) || s.code.toLowerCase().includes(q));
+  $("#count").textContent = `${list.length}건`;
+  if (!list.length) {
+    $("#rows").innerHTML = `<tr><td colspan="6" class="empty">${SIGNALS.length ? "검색 결과가 없습니다." : "아직 시그널이 없습니다."}</td></tr>`;
+    return;
+  }
+  let html = "", lastDate = "";
+  for (const s of list) {
+    if (s.date !== lastDate) {
+      html += `<tr class="date-row"><td colspan="6">${fmtDate(s.date)}</td></tr>`;
+      lastDate = s.date;
+    }
+    const live = s.source.startsWith("장중");
+    html += `<tr class="sig" tabindex="0" data-key="${esc(s.code)}_${esc(s.date)}">
+      <td><span class="name">${esc(s.name)}</span><span class="code">${esc(s.code)}</span></td>
+      <td class="hide-sm">${esc(s.market || "-")}</td>
+      <td class="num buy">${fmtEok(s.buy_eok)}</td>
+      <td class="num hide-sm">${s.past_max_eok.toFixed(2)}억</td>
+      <td class="num hide-sm">${s.active_days}/${s.lookback}일</td>
+      <td><span class="tag ${live ? "live" : ""}">${esc(s.source)}</span></td>
+    </tr>`;
+  }
+  $("#rows").innerHTML = html;
+}
+
+$("#q").addEventListener("input", renderList);
+$("#rows").addEventListener("click", (e) => { const tr = e.target.closest("tr.sig"); if (tr) openModal(tr.dataset.key); });
+$("#rows").addEventListener("keydown", (e) => {
+  if (e.key === "Enter") { const tr = e.target.closest("tr.sig"); if (tr) openModal(tr.dataset.key); }
+});
+
+// ---------- modal ----------
+function closeModal() { $("#backdrop").classList.remove("open"); }
+$("#close").addEventListener("click", closeModal);
+$("#backdrop").addEventListener("click", (e) => { if (e.target.id === "backdrop") closeModal(); });
+document.addEventListener("keydown", (e) => { if (e.key === "Escape") closeModal(); });
+window.addEventListener("resize", () => { if (CURRENT) drawCharts(CURRENT); });
+
+let CURRENT = null;
+
+async function openModal(key) {
+  const s = SIGNALS.find((x) => `${x.code}_${x.date}` === key);
+  $("#m-title").innerHTML = `${esc(s.name)} <span class="code">${esc(s.code)}</span>`;
+  $("#m-meta").textContent = `${s.market ? s.market + " · " : ""}신호일 ${fmtDate(s.date)} · 연기금 순매수 ${fmtEok(s.buy_eok)} · 직전 ${s.lookback}일 최대 ${s.past_max_eok.toFixed(2)}억`;
+  $("#m-body").innerHTML = `<div class="status">연기금 매매 추이를 불러오는 중…</div>`;
+  $("#backdrop").classList.add("open");
+  $("#close").focus();
+  CURRENT = null;
+  try {
+    const rows = await getFlow(s.code);
+    const signalDates = new Set(SIGNALS.filter((x) => x.code === s.code).map((x) => x.date));
+    CURRENT = { rows: rows.filter((r) => r.close > 0), signalDates, focus: s.date };
+    $("#m-body").innerHTML = `
+      <div class="chart-title">연기금 일별 순매수</div>
+      <div class="legend"><span><i style="background:var(--buy)"></i>순매수</span><span><i style="background:var(--sell)"></i>순매도</span><span>▼ 신호일</span></div>
+      <div class="chart" id="c-flow"></div>
+      <div class="chart-title">종가</div>
+      <div class="chart" id="c-price"></div>
+      <div class="tooltip" id="tip"></div>
+      <button class="toggle" id="toggle">표 보기</button>
+      <div class="data-table" id="dtable"></div>`;
+    $("#toggle").addEventListener("click", () => {
+      const t = $("#dtable"); t.classList.toggle("open");
+      $("#toggle").textContent = t.classList.contains("open") ? "표 닫기" : "표 보기";
+    });
+    $("#dtable").innerHTML = `<table><thead><tr><th>일자</th><th class="num">연기금 순매수</th><th class="num">종가</th></tr></thead><tbody>${
+      [...CURRENT.rows].reverse().map((r) => `<tr><td>${fmtDate(r.dt)}${signalDates.has(r.dt) ? " ▼" : ""}</td><td class="num">${fmtEok(r.pension)}</td><td class="num">${fmtWon(r.close)}</td></tr>`).join("")
+    }</tbody></table>`;
+    drawCharts(CURRENT);
+  } catch (err) {
+    $("#m-body").innerHTML = `<div class="status">불러오지 못했습니다: ${esc(err.message)}</div>`;
+  }
+}
+
+// ---------- charts (SVG) ----------
+const NS = "http://www.w3.org/2000/svg";
+const M = { l: 56, r: 12 };
+
+function el(tag, attrs, parent) {
+  const n = document.createElementNS(NS, tag);
+  for (const k in attrs) n.setAttribute(k, attrs[k]);
+  if (parent) parent.appendChild(n);
+  return n;
+}
+
+function niceTicks(min, max, count = 4) {
+  const span = max - min || 1;
+  const step0 = span / count;
+  const mag = Math.pow(10, Math.floor(Math.log10(step0)));
+  const step = [1, 2, 2.5, 5, 10].map((m) => m * mag).find((s) => s >= step0);
+  const ticks = [];
+  for (let v = Math.floor(min / step) * step; v <= max + 1e-9; v += step) ticks.push(+v.toFixed(10));
+  return ticks;
+}
+
+// 기준선에 붙은 쪽은 각지게, 데이터 끝만 4px 둥글게
+function barPath(x, w, y0, y1) {
+  const up = y1 < y0;
+  const h = Math.abs(y1 - y0);
+  const r = Math.min(4, w / 2, h);
+  if (h < 0.5) return "";
+  if (up) return `M${x},${y0} V${y1 + r} Q${x},${y1} ${x + r},${y1} H${x + w - r} Q${x + w},${y1} ${x + w},${y1 + r} V${y0} Z`;
+  return `M${x},${y0} V${y1 - r} Q${x},${y1} ${x + r},${y1} H${x + w - r} Q${x + w},${y1} ${x + w},${y1 - r} V${y0} Z`;
+}
+
+function drawCharts(state) {
+  const { rows, signalDates, focus } = state;
+  const flowBox = $("#c-flow"), priceBox = $("#c-price");
+  if (!flowBox) return;
+  flowBox.innerHTML = ""; priceBox.innerHTML = "";
+  const W = flowBox.clientWidth, n = rows.length;
+  const pw = W - M.l - M.r, band = pw / n;
+  const xAt = (i) => M.l + i * band;
+
+  // 1) 연기금 순매수 막대
+  const H1 = 220, T1 = 18, B1 = 22;
+  const svg1 = el("svg", { viewBox: `0 0 ${W} ${H1}`, height: H1, role: "img", "aria-label": "연기금 일별 순매수 막대 차트" }, flowBox);
+  const vals = rows.map((r) => r.pension);
+  const lo = Math.min(0, ...vals), hi = Math.max(0, ...vals);
+  const ticks = niceTicks(lo, hi);
+  const yMin = Math.min(lo, ticks[0]), yMax = Math.max(hi, ticks[ticks.length - 1]);
+  const y1 = (v) => T1 + (yMax - v) / (yMax - yMin || 1) * (H1 - T1 - B1);
+  for (const t of ticks) {
+    el("line", { x1: M.l, x2: W - M.r, y1: y1(t), y2: y1(t), stroke: t === 0 ? "var(--text-muted)" : "var(--grid)", "stroke-width": 1 }, svg1);
+    el("text", { x: M.l - 8, y: y1(t) + 4, "text-anchor": "end" }, svg1).textContent = `${t}억`;
+  }
+  const gap = band > 4 ? 2 : 0;
+  rows.forEach((r, i) => {
+    const d = barPath(xAt(i) + gap / 2, Math.max(band - gap, 1), y1(0), y1(r.pension));
+    if (d) el("path", { d, fill: r.pension >= 0 ? "var(--buy)" : "var(--sell)" }, svg1);
+    if (signalDates.has(r.dt)) {
+      const t = el("text", { x: xAt(i) + band / 2, y: T1 - 4, "text-anchor": "middle", style: `fill:var(--text-primary);font-size:${r.dt === focus ? 13 : 10}px` }, svg1);
+      t.textContent = "▼";
+    }
+  });
+  xLabels(svg1, rows, xAt, band, H1 - 6);
+
+  // 2) 종가 선
+  const H2 = 150, T2 = 10, B2 = 22;
+  const svg2 = el("svg", { viewBox: `0 0 ${W} ${H2}`, height: H2, role: "img", "aria-label": "종가 선 차트" }, priceBox);
+  const closes = rows.map((r) => r.close);
+  const pt = niceTicks(Math.min(...closes), Math.max(...closes), 3);
+  const pMin = Math.min(pt[0], ...closes), pMax = Math.max(pt[pt.length - 1], ...closes);
+  const y2 = (v) => T2 + (pMax - v) / (pMax - pMin || 1) * (H2 - T2 - B2);
+  for (const t of pt) {
+    el("line", { x1: M.l, x2: W - M.r, y1: y2(t), y2: y2(t), stroke: "var(--grid)", "stroke-width": 1 }, svg2);
+    el("text", { x: M.l - 8, y: y2(t) + 4, "text-anchor": "end" }, svg2).textContent = t.toLocaleString("ko-KR");
+  }
+  rows.forEach((r, i) => {
+    if (signalDates.has(r.dt)) el("line", { x1: xAt(i) + band / 2, x2: xAt(i) + band / 2, y1: T2, y2: H2 - B2, stroke: "var(--text-muted)", "stroke-dasharray": "3 3" }, svg2);
+  });
+  el("path", {
+    d: rows.map((r, i) => `${i ? "L" : "M"}${xAt(i) + band / 2},${y2(r.close)}`).join(""),
+    fill: "none", stroke: "var(--line)", "stroke-width": 2, "stroke-linejoin": "round",
+  }, svg2);
+  xLabels(svg2, rows, xAt, band, H2 - 6);
+
+  // 3) 호버: 두 차트 공통 세로선 + 툴팁
+  const guides = [svg1, svg2].map((s, k) =>
+    el("line", { y1: k ? T2 : T1, y2: k ? H2 - B2 : H1 - B1, stroke: "var(--text-secondary)", "stroke-width": 1, visibility: "hidden" }, s));
+  const dot = el("circle", { r: 4, fill: "var(--line)", stroke: "var(--surface)", "stroke-width": 2, visibility: "hidden" }, svg2);
+  const tip = $("#tip");
+  const body = $("#m-body");
+  const onMove = (e) => {
+    const rect = e.currentTarget.getBoundingClientRect();
+    const i = Math.max(0, Math.min(n - 1, Math.floor((e.clientX - rect.left - M.l * rect.width / W) / (band * rect.width / W))));
+    const r = rows[i], cx = xAt(i) + band / 2;
+    guides.forEach((g) => { g.setAttribute("x1", cx); g.setAttribute("x2", cx); g.setAttribute("visibility", "visible"); });
+    dot.setAttribute("cx", cx); dot.setAttribute("cy", y2(r.close)); dot.setAttribute("visibility", "visible");
+    tip.innerHTML = `<b>${fmtDate(r.dt)}${signalDates.has(r.dt) ? " · 신호일" : ""}</b><div class="row">연기금 ${fmtEok(r.pension)}</div><div class="row">종가 ${fmtWon(r.close)}</div>`;
+    tip.style.display = "block";
+    const b = body.getBoundingClientRect();
+    let left = e.clientX - b.left + 14;
+    if (left + tip.offsetWidth > b.width) left = e.clientX - b.left - tip.offsetWidth - 14;
+    tip.style.left = `${left}px`;
+    tip.style.top = `${e.clientY - b.top + body.scrollTop - 10}px`;
+  };
+  const onLeave = () => {
+    guides.forEach((g) => g.setAttribute("visibility", "hidden"));
+    dot.setAttribute("visibility", "hidden");
+    tip.style.display = "none";
+  };
+  [svg1, svg2].forEach((s) => { s.addEventListener("mousemove", onMove); s.addEventListener("mouseleave", onLeave); });
+}
+
+function xLabels(svg, rows, xAt, band, y) {
+  const every = Math.ceil(rows.length / Math.max(2, Math.floor((xAt(rows.length) - xAt(0)) / 70)));
+  rows.forEach((r, i) => {
+    if (i % every === 0) el("text", { x: xAt(i) + band / 2, y, "text-anchor": "middle" }, svg).textContent = `${r.dt.slice(4, 6)}/${r.dt.slice(6, 8)}`;
+  });
+}
+
+loadSignals().catch((e) => { $("#rows").innerHTML = `<tr><td colspan="6" class="empty">불러오지 못했습니다: ${esc(e.message)}</td></tr>`; });
+</script>
+</body>
+</html>

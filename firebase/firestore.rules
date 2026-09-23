@@ -1,0 +1,40 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // analyses: 일별 분석 결과 (날짜 문서 ID). 프론트/백엔드 읽기용
+    match /analyses/{date} {
+      allow read: if true;
+      allow write: if false;
+    }
+    
+    // stock_issues: 종목별 최근 이슈 요약 (티커 문서 ID). 백엔드가 저장, 프론트가 읽기
+    match /stock_issues/{ticker} {
+      allow read: if true;
+      allow write: if false;
+    }
+    
+    // daily_insights: 일별 시장 흐름 해설 (날짜 문서 ID). 백엔드가 저장, 프론트가 읽기
+    match /daily_insights/{date} {
+      allow read: if true;
+      allow write: if false;
+    }
+
+    // disclosures: 공시 정보 (접수번호 문서 ID). 백엔드가 저장, 프론트가 읽기
+    match /disclosures/{rceptNo} {
+      allow read: if true;
+      allow write: if false;
+    }
+
+    // pension_signals: 연기금 시그널 목록. screener.publish 가 저장, 웹이 읽기
+    match /pension_signals/{docId} {
+      allow read: if true;
+      allow write: if false;
+    }
+
+    // pension_flow: 종목별 연기금 수급 추이 (종목코드 문서 ID). screener.publish 가 저장, 웹이 읽기
+    match /pension_flow/{code} {
+      allow read: if true;
+      allow write: if false;
+    }
+  }
+}

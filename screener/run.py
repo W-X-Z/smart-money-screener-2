@@ -16,6 +16,7 @@ import json
 from datetime import datetime
 from pathlib import Path
 
+from screener import store
 from screener.kiwoom import NON_STOCK, ROOT, Kiwoom, num
 
 OUT_DIR = ROOT / "output"
@@ -41,6 +42,7 @@ def main() -> None:
     ap.add_argument("--lookback", type=int, default=20, help="침묵 판단 기간 (거래일)")
     ap.add_argument("--quiet-max", type=float, default=30, help="침묵 기간 중 일별 |순매수| 상한 (백만원)")
     ap.add_argument("--show", type=int, default=15, help="진단 표에 보여줄 후보 수")
+    ap.add_argument("--publish", action="store_true", help="결과를 Firestore 에 올려 배포 웹에 반영")
     args = ap.parse_args()
 
     now = datetime.now()
@@ -101,6 +103,18 @@ def main() -> None:
         print(f"후보 전체 -> {out}")
 
     signals = [x for x in rows if x["신호"]]
+    meta = store.universe_meta()
+    store.upsert([{
+        "date": today,
+        "code": x["종목코드"],
+        "name": x["종목명"],
+        "market": meta.get(x["종목코드"], {}).get("market", ""),
+        "buy_eok": x["오늘순매수(억)"],
+        "past_max_eok": x["과거최대|x|(억)"],
+        "active_days": x["과거매매일수"],
+        "lookback": args.lookback,
+        "source": f"장중 {now:%H:%M}",
+    } for x in signals])
     print(f"\n🔔 신호 {len(signals)} 종목 (과거 {args.lookback}일 매일 |순매수| <= {args.quiet_max / 100:g}억)")
     print(f"\n가장 조용했던 후보 상위 {args.show} (과거 {args.lookback}일 기준)")
     cols = [c for c in rows[0].keys() if c != "신호"] if rows else []
@@ -108,6 +122,10 @@ def main() -> None:
     for x in rows[: args.show]:
         mark = "✅" if x["신호"] else "  "
         print(f"{mark}  " + " | ".join(str(x[c]) for c in cols))
+
+    if args.publish:
+        from screener.publish import publish
+        publish(codes=[x["종목코드"] for x in signals])
 
 
 if __name__ == "__main__":
