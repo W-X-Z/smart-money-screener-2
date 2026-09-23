@@ -34,7 +34,16 @@ def load_env() -> None:
         line = line.strip()
         if line and not line.startswith("#") and "=" in line:
             k, v = line.split("=", 1)
-            os.environ.setdefault(k.strip(), v.strip())
+            os.environ.setdefault(k.strip(), v.strip().strip("'\""))
+
+
+def check_keys() -> None:
+    missing = [k for k in ("KIWOOM_APP_KEY", "KIWOOM_SECRET_KEY") if not os.environ.get(k)]
+    if missing:
+        sys.exit(f".env 에 값이 비어 있습니다: {', '.join(missing)}\n"
+                 f"  편집: open -e {ROOT / '.env'}")
+    for k in ("KIWOOM_APP_KEY", "KIWOOM_SECRET_KEY"):
+        print(f"{k}: {len(os.environ[k])}자 로드")
 
 
 def issue_token() -> str:
@@ -96,6 +105,7 @@ def summarize(result: dict) -> str:
 
 def main() -> None:
     load_env()
+    check_keys()
     stk_cd = sys.argv[1] if len(sys.argv) > 1 else "005930"
     today = date.today().strftime("%Y%m%d")
 
