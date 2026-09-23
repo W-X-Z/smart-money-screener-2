@@ -2,6 +2,7 @@
 
 import os
 import sys
+import threading
 import time
 from pathlib import Path
 from typing import Dict, List, Optional
@@ -13,7 +14,8 @@ ROOT = Path(__file__).resolve().parent.parent
 
 # 시세성 조회 경로만 허용 (주문 /ordr, 계좌 /acnt 등은 호출 불가)
 ALLOWED_PATHS = {"/api/dostk/stkinfo", "/api/dostk/mrkcond", "/api/dostk/rkinfo", "/api/dostk/frgnistt"}
-CALL_INTERVAL = 0.25  # 초당 호출 제한 여유
+CALL_INTERVAL = 0.2  # 전체 호출 간격 (초당 5회). 스레드 간 공유
+RETRIES = 3
 
 
 def load_env() -> None:
@@ -58,7 +60,8 @@ class Kiwoom:
         if not data.get("token"):
             sys.exit(f"토큰 발급 실패: {data.get('return_code')} {data.get('return_msg')}")
         self.token = data["token"]
-        self._last_call = 0.0
+        self._next_slot = 0.0
+        self._lock = threading.Lock()
 
     def call(self, path: str, api_id: str, body: dict, list_key: str, max_pages: int = 1) -> List[Dict]:
         """조회 후 list_key 의 행 목록을 반환. max_pages > 1 이면 연속조회."""
@@ -66,31 +69,49 @@ class Kiwoom:
         rows: List[Dict] = []
         cont_yn, next_key = "N", ""
         for _ in range(max_pages):
-            wait = CALL_INTERVAL - (time.time() - self._last_call)
-            if wait > 0:
-                time.sleep(wait)
-            resp = requests.post(
-                f"{BASE_URL}{path}",
-                json=body,
-                headers={
-                    "Content-Type": "application/json;charset=UTF-8",
-                    "authorization": f"Bearer {self.token}",
-                    "api-id": api_id,
-                    "cont-yn": cont_yn,
-                    "next-key": next_key,
-                },
-                timeout=15,
-            )
-            self._last_call = time.time()
-            data = resp.json()
-            if data.get("return_code") != 0:
-                raise RuntimeError(f"{api_id} 실패: {data.get('return_code')} {data.get('return_msg')}")
+            resp, data = self._post_with_retry(path, api_id, body, cont_yn, next_key)
             rows.extend(data.get(list_key) or [])
             cont_yn = resp.headers.get("cont-yn", "N")
             next_key = resp.headers.get("next-key", "")
             if cont_yn != "Y":
                 break
         return rows
+
+    def _throttle(self) -> None:
+        with self._lock:
+            now = time.time()
+            slot = max(now, self._next_slot)
+            self._next_slot = slot + CALL_INTERVAL
+        if slot > now:
+            time.sleep(slot - now)
+
+    def _post_with_retry(self, path, api_id, body, cont_yn, next_key):
+        err = ""
+        for attempt in range(RETRIES + 1):
+            if attempt:
+                time.sleep(2 ** attempt)  # 2, 4, 8초
+            self._throttle()
+            try:
+                resp = requests.post(
+                    f"{BASE_URL}{path}",
+                    json=body,
+                    headers={
+                        "Content-Type": "application/json;charset=UTF-8",
+                        "authorization": f"Bearer {self.token}",
+                        "api-id": api_id,
+                        "cont-yn": cont_yn,
+                        "next-key": next_key,
+                    },
+                    timeout=15,
+                )
+                data = resp.json()
+            except (requests.RequestException, ValueError) as e:
+                err = str(e)
+                continue
+            if data.get("return_code") == 0:
+                return resp, data
+            err = f"{data.get('return_code')} {data.get('return_msg')}"
+        raise RuntimeError(f"{api_id} 실패: {err}")
 
     # --- 사용하는 API ---
 
