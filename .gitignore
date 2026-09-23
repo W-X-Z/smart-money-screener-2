@@ -3,3 +3,4 @@
 probe_output/
 __pycache__/
 .venv/
+output/

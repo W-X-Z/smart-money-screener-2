@@ -1,0 +1,114 @@
+"""키움 REST API 최소 클라이언트 (시세 조회 전용)."""
+
+import os
+import sys
+import time
+from pathlib import Path
+from typing import Dict, List, Optional
+
+import requests
+
+BASE_URL = "https://api.kiwoom.com"
+ROOT = Path(__file__).resolve().parent.parent
+
+# 시세성 조회 경로만 허용 (주문 /ordr, 계좌 /acnt 등은 호출 불가)
+ALLOWED_PATHS = {"/api/dostk/stkinfo", "/api/dostk/mrkcond", "/api/dostk/rkinfo", "/api/dostk/frgnistt"}
+CALL_INTERVAL = 0.25  # 초당 호출 제한 여유
+
+
+def load_env() -> None:
+    env = ROOT / ".env"
+    if env.exists():
+        for line in env.read_text().splitlines():
+            line = line.strip()
+            if line and not line.startswith("#") and "=" in line:
+                k, v = line.split("=", 1)
+                os.environ.setdefault(k.strip(), v.strip().strip("'\""))
+    missing = [k for k in ("KIWOOM_APP_KEY", "KIWOOM_SECRET_KEY") if not os.environ.get(k)]
+    if missing:
+        sys.exit(f".env 에 값이 비어 있습니다: {', '.join(missing)}")
+
+
+def num(value) -> float:
+    """키움 숫자 문자열 파싱: '+285500', '--421'(음수), '-0', '' 등."""
+    s = str(value or "").strip().replace("+", "").replace(",", "")
+    neg = s.startswith("-")
+    s = s.lstrip("-")
+    if not s:
+        return 0.0
+    v = float(s)
+    return -v if neg else v
+
+
+class Kiwoom:
+    def __init__(self) -> None:
+        load_env()
+        resp = requests.post(
+            f"{BASE_URL}/oauth2/token",
+            json={
+                "grant_type": "client_credentials",
+                "appkey": os.environ["KIWOOM_APP_KEY"],
+                "secretkey": os.environ["KIWOOM_SECRET_KEY"],
+            },
+            headers={"Content-Type": "application/json;charset=UTF-8"},
+            timeout=15,
+        )
+        resp.raise_for_status()
+        data = resp.json()
+        if not data.get("token"):
+            sys.exit(f"토큰 발급 실패: {data.get('return_code')} {data.get('return_msg')}")
+        self.token = data["token"]
+        self._last_call = 0.0
+
+    def call(self, path: str, api_id: str, body: dict, list_key: str, max_pages: int = 1) -> List[Dict]:
+        """조회 후 list_key 의 행 목록을 반환. max_pages > 1 이면 연속조회."""
+        assert path in ALLOWED_PATHS, f"허용되지 않은 경로: {path}"
+        rows: List[Dict] = []
+        cont_yn, next_key = "N", ""
+        for _ in range(max_pages):
+            wait = CALL_INTERVAL - (time.time() - self._last_call)
+            if wait > 0:
+                time.sleep(wait)
+            resp = requests.post(
+                f"{BASE_URL}{path}",
+                json=body,
+                headers={
+                    "Content-Type": "application/json;charset=UTF-8",
+                    "authorization": f"Bearer {self.token}",
+                    "api-id": api_id,
+                    "cont-yn": cont_yn,
+                    "next-key": next_key,
+                },
+                timeout=15,
+            )
+            self._last_call = time.time()
+            data = resp.json()
+            if data.get("return_code") != 0:
+                raise RuntimeError(f"{api_id} 실패: {data.get('return_code')} {data.get('return_msg')}")
+            rows.extend(data.get(list_key) or [])
+            cont_yn = resp.headers.get("cont-yn", "N")
+            next_key = resp.headers.get("next-key", "")
+            if cont_yn != "Y":
+                break
+        return rows
+
+    # --- 사용하는 API ---
+
+    def intraday_investor(self, invsr: str, mrkt_tp: str = "000") -> List[Dict]:
+        """ka10063 장중투자자별매매 (잠정). 금액 단위 백만원."""
+        return self.call("/api/dostk/mrkcond", "ka10063", {
+            "mrkt_tp": mrkt_tp, "amt_qty_tp": "1", "invsr": invsr,
+            "frgn_all": "0", "smtm_netprps_tp": "0", "stex_tp": "1",
+        }, "opmr_invsr_trde", max_pages=5)
+
+    def intraday_top_pension(self, mrkt_tp: str) -> List[Dict]:
+        """ka10065 장중투자자별매매상위 - 연기금(6000) 순매수. 수량 단위 주."""
+        return self.call("/api/dostk/rkinfo", "ka10065", {
+            "trde_tp": "1", "mrkt_tp": mrkt_tp, "orgn_tp": "6000",
+        }, "opmr_invsr_trde_upper")
+
+    def daily_investor(self, stk_cd: str, dt: str) -> List[Dict]:
+        """ka10059 종목별투자자기관별 - dt 부터 과거로 일별 100행. 금액 단위 백만원."""
+        return self.call("/api/dostk/stkinfo", "ka10059", {
+            "dt": dt, "stk_cd": stk_cd, "amt_qty_tp": "1", "trde_tp": "0", "unit_tp": "1000",
+        }, "stk_invsr_orgn")
