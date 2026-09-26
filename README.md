@@ -28,7 +28,7 @@ python -m screener.run --min-buy 300 --lookback 20 --quiet-max 30
 ## 운영 구조
 
 ```
-[일배치] GitHub Actions 평일 18:30 KST ── KRX 확정치 ──┐
+[일배치] GitHub Actions 평일 16:10 KST ── KRX 확정치 ──┐
                                                       ├→ public/data/signals.json 커밋 → Vercel 자동 배포
 [장중]   회사 Mac (키움 잠정치) ──────────────────────┘
 [웹]     Vercel 정적 페이지 → 종목 클릭 → /api/flow (Vercel 함수, 서울 리전) → KRX
