@@ -268,6 +268,9 @@ def clustered_ci(df: pd.DataFrame, col: str, n=2000):
     return tuple(np.round(np.percentile(means, [2.5, 97.5]), 2))
 
 
+PARTS = ("전반", "후반")
+
+
 def summarize(name: str, ev: pd.DataFrame, weeks: float, split_t: int, entry="T+1시가") -> dict:
     out = {"로직": name, "신호수": len(ev), "주당": round(len(ev) / weeks, 2), "종목수": ev.code.nunique()}
     for h in HORIZONS:
@@ -278,7 +281,7 @@ def summarize(name: str, ev: pd.DataFrame, weeks: float, split_t: int, entry="T+
         out[f"{h}일 승률%"] = round((v > 0).mean() * 100) if len(v) else np.nan
     lo, hi = clustered_ci(ev, f"x20_{entry}")
     out["20일 평균 95%구간"] = f"{lo} ~ {hi}"
-    for label, part in (("전반", ev[ev.t < split_t]), ("후반", ev[ev.t >= split_t])):
+    for label, part in ((PARTS[0], ev[ev.t < split_t]), (PARTS[1], ev[ev.t >= split_t])):
         v = part[f"x20_{entry}"].dropna()
         out[f"{label} 20일 중앙%"] = round(v.median(), 2) if len(v) else np.nan
         out[f"{label} 신호수"] = len(part)
@@ -308,15 +311,36 @@ EXPERIMENTS: List[tuple] = [
     ("4 침묵 기간", "40일: 1억↑ & 거래대금5%↑ & 급증배수 20배↑", rule(adv_pct=5, quiet="ratio", ratio=20, L=40)),
     ("5 유동성", "1억↑ & 거래대금5%↑ & 급증배수 20배↑ & 평균거래대금 5억↑",
      rule(adv_pct=5, quiet="ratio", ratio=20, min_adv_eok=5)),
+    # 금액 하한 유지하고 침묵 조건만 완화 (신호 수 늘리기)
+    ("6 금액 유지·침묵 완화", "2억↑ & 20일 매일 |순매수|≤0.3억", rule(min_eok=2)),
+    ("6 금액 유지·침묵 완화", "5억↑ & 20일 매일 |순매수|≤0.3억", rule(min_eok=5)),
+    ("6 금액 유지·침묵 완화", "3억↑ & 20일 매일 |순매수|≤0.5억", rule(min_eok=3, quiet_eok=0.5)),
+    ("6 금액 유지·침묵 완화", "3억↑ & 20일 매일 |순매수|≤1억", rule(min_eok=3, quiet_eok=1.0)),
+    ("6 금액 유지·침묵 완화", "3억↑ & 0.3억 초과일 1일 이하", rule(min_eok=3, quiet="tolerant", big_days=1)),
+    ("6 금액 유지·침묵 완화", "3억↑ & 0.3억 초과일 2일 이하", rule(min_eok=3, quiet="tolerant", big_days=2)),
+    ("6 금액 유지·침묵 완화", "3억↑ & 급증배수 20배↑", rule(min_eok=3, quiet="ratio", ratio=20)),
+    ("6 금액 유지·침묵 완화", "3억↑ & 급증배수 50배↑", rule(min_eok=3, quiet="ratio", ratio=50)),
+    ("6 금액 유지·침묵 완화", "3억↑ & 10일 매일 |순매수|≤0.3억", rule(min_eok=3, L=10)),
+    ("6 금액 유지·침묵 완화", "2일 누적 3억↑ & 그 전 20일 매일 |순매수|≤0.3억", rule(min_eok=3, k=2)),
+    ("6 금액 유지·침묵 완화", "3억↑ & 거래대금 5%↑ & 20일 매일 |순매수|≤0.3억", rule(min_eok=3, adv_pct=5)),
 ]
 
 
 def main() -> None:
+    import argparse
+    global PARTS
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--split", help="YYYYMMDD: 이 날짜 이전/이후로 나눠 비교 (없으면 기간 절반)")
+    args = ap.parse_args()
+
     p = load()
     f = build(p)
     D = len(p.dates)
     start = 45  # 침묵 40일 + 여유: 이 이전은 이력이 부족해 평가에서 제외
     split_t = start + (D - start) // 2
+    if args.split:
+        split_t = int(np.searchsorted(p.dates, args.split))
+        PARTS = ("과거 1년", "최근 1년")
     weeks = (D - start) / 5
     print(f"기간 {p.dates[start]} ~ {p.dates[-1]} ({D - start}거래일), 종목 {len(p.codes)}")
     print(f"전반/후반 경계: {p.dates[split_t]}")
