@@ -64,11 +64,11 @@ def replace_confirmed(start: str, end: str, signals: List[dict]) -> None:
 
 
 CSV_COLS = [
-    ("신호일", "date"), ("종목코드", "code"), ("종목명", "name"), ("시장", "market"),
-    ("연기금 순매수(억, 1~2일)", "buy_eok"), ("거래대금 대비(%)", "adv_pct"), ("직전 20일 최대(억)", "past_max_eok"),
-    ("0.3억 초과일", "big_days"), ("2일 누적", "two_day"), ("우선주", "pref"),
-    ("신호 후 수익률(%)", "ret_pct"), ("경과 거래일", "ret_days"),
-    ("구분", "source"), ("장중 선행", "intraday"), ("갱신", "updated_at"),
+    ("매수일", "date"), ("종목코드", "code"), ("종목명", "name"), ("시장", "market"),
+    ("연기금 순매수(억)", "buy_eok"), ("평소 거래대금 대비(%)", "adv_pct"), ("그 전 한 달 가장 큰 거래(억)", "past_max_eok"),
+    ("그 전 한 달 3천만 원 넘는 거래일", "big_days"), ("이틀 합계", "two_day"), ("우선주", "pref"),
+    ("이후 수익률(%)", "ret_pct"), ("지난 거래일", "ret_days"),
+    ("구분", "source"), ("장중에 먼저 포착", "intraday"), ("업데이트", "updated_at"),
 ]
 
 

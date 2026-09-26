@@ -177,28 +177,28 @@ svg.c text { fill: var(--text-3); font-size: 11px; font-family: inherit; }
   </header>
 
   <div class="toolbar">
-    <div class="seg" id="presets" role="group" aria-label="프리셋">
+    <div class="seg" id="presets" role="group" aria-label="보기 범위">
       <button data-p="추천" aria-pressed="true">추천</button>
-      <button data-p="균형" aria-pressed="false">균형</button>
       <button data-p="넓게" aria-pressed="false">넓게</button>
+      <button data-p="전체" aria-pressed="false">전체</button>
     </div>
     <button class="fbtn" id="fbtn" aria-expanded="false" aria-controls="fcard">
       <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round"><path d="M4 7h10M18 7h2M4 17h4M12 17h8"/><circle cx="16" cy="7" r="2"/><circle cx="10" cy="17" r="2"/></svg>필터<span class="dot"></span>
     </button>
     <label class="search">
       <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
-      <input id="q" type="search" placeholder="종목 검색" aria-label="종목 검색">
+      <input id="q" type="search" placeholder="종목명·코드 검색" aria-label="종목명이나 코드로 검색">
     </label>
   </div>
 
   <div class="fcard" id="fcard">
-    <div class="frow"><div class="lbl">연기금이 산 금액<small>하루 또는 이틀 합계</small></div>
-      <div class="seg sm" data-f="amount" role="group" aria-label="연기금이 산 금액"><button data-v="1">1억 이상</button><button data-v="3">3억 이상</button><button data-v="5">5억 이상</button></div></div>
-    <div class="frow"><div class="lbl">그 전 20일간 연기금 매매<small>0.3억 넘게 사고판 날 수</small></div>
-      <div class="seg sm" data-f="silence" role="group" aria-label="그 전 20일간 연기금 매매"><button data-v="0">없음</button><button data-v="1">1일까지</button><button data-v="2">2일까지</button></div></div>
-    <div class="frow"><div class="lbl">큰 종목의 소액 매수 제외<small>5억 미만이면 평소 하루 거래대금의 5% 이상일 때만</small></div><input type="checkbox" class="switch" data-f="scale" aria-label="큰 종목의 소액 매수 제외"></div>
-    <div class="frow"><div class="lbl">이틀에 나눠 산 경우 포함</div><input type="checkbox" class="switch" data-f="two_day" aria-label="이틀에 나눠 산 경우 포함"></div>
-    <div class="frow"><div class="lbl">우선주 포함</div><input type="checkbox" class="switch" data-f="pref" aria-label="우선주 포함"></div>
+    <div class="frow"><div class="lbl">연기금 매수 금액<small>이틀 연속 샀다면 합계</small></div>
+      <div class="seg sm" data-f="amount" role="group" aria-label="연기금 매수 금액"><button data-v="1">1억 이상</button><button data-v="3">3억 이상</button><button data-v="5">5억 이상</button></div></div>
+    <div class="frow"><div class="lbl">사기 전 한 달간 연기금 거래<small>3천만 원 넘게 사고판 날 (20거래일)</small></div>
+      <div class="seg sm" data-f="silence" role="group" aria-label="사기 전 한 달간 연기금 거래"><button data-v="0">없음</button><button data-v="1">하루까지</button><button data-v="2">이틀까지</button></div></div>
+    <div class="frow"><div class="lbl">종목 규모에 비해 작은 매수 빼기<small>5억 미만은 평소 하루 거래대금의 5%를 넘을 때만 보여요</small></div><input type="checkbox" class="switch" data-f="scale" aria-label="종목 규모에 비해 작은 매수 빼기"></div>
+    <div class="frow"><div class="lbl">이틀 연속 산 종목도 보기</div><input type="checkbox" class="switch" data-f="two_day" aria-label="이틀 연속 산 종목도 보기"></div>
+    <div class="frow"><div class="lbl">우선주도 보기</div><input type="checkbox" class="switch" data-f="pref" aria-label="우선주도 보기"></div>
     <div class="frow"><div class="lbl">시장</div>
       <div class="seg sm" data-f="market" role="group" aria-label="시장"><button data-v="">전체</button><button data-v="코스피">코스피</button><button data-v="코스닥">코스닥</button></div></div>
   </div>
@@ -206,7 +206,7 @@ svg.c text { fill: var(--text-3); font-size: 11px; font-family: inherit; }
   <div class="cond" id="cond"></div>
   <div class="stats" id="stats"></div>
 
-  <main id="list"><div class="empty">불러오는 중</div></main>
+  <main id="list"><div class="empty">불러오고 있어요</div></main>
 </div>
 
 <div class="scrim" id="scrim"></div>
@@ -230,8 +230,8 @@ const CHEV = `<svg class="chev" viewBox="0 0 24 24" fill="none" stroke-width="2"
 
 const PRESETS = {
   추천: { amount: 3, silence: 0, scale: true, two_day: true, pref: true },
-  균형: { amount: 3, silence: 1, scale: true, two_day: true, pref: true },
-  넓게: { amount: 1, silence: 2, scale: false, two_day: true, pref: true },
+  넓게: { amount: 3, silence: 1, scale: true, two_day: true, pref: true },
+  전체: { amount: 1, silence: 2, scale: false, two_day: true, pref: true },
 };
 const COOLDOWN = 20; // 같은 종목 재신호 억제 (거래일), engine/signals.py 와 동일
 let SIGNALS = [], STATS = null, CURRENT = null, UPDATED = "";
@@ -247,7 +247,7 @@ async function load() {
   STATS = st && st.ok ? await st.json() : null;
   const last = res.headers.get("last-modified");
   const upd = last ? new Date(last) : null;
-  UPDATED = upd ? ` · ${upd.getMonth() + 1}/${upd.getDate()} ${String(upd.getHours()).padStart(2, "0")}:${String(upd.getMinutes()).padStart(2, "0")}` : "";
+  UPDATED = upd ? ` · ${upd.getMonth() + 1}/${upd.getDate()} ${String(upd.getHours()).padStart(2, "0")}:${String(upd.getMinutes()).padStart(2, "0")} 기준` : "";
   syncControls(); render();
 }
 
@@ -283,21 +283,21 @@ function renderStats() {
   if (!s || !s.x20) { $("#stats").innerHTML = ""; return; }
   const pct = (v) => `${v > 0 ? "+" : ""}${v.toFixed(1)}%`;
   const base = STATS.baseline && STATS.baseline.x20 ? STATS.baseline.x20.mean : null;
-  $("#stats").innerHTML = `<span>과거 2년 이 조건으로</span><span>주 <b>${s.per_week}건</b></span>`
-    + `<span>20일 뒤 시장 대비 중앙값 <b>${pct(s.x20.median)}</b></span>`
-    + `<span>평균 <b>${pct(s.x20.mean)}</b>${base != null ? ` (아무 종목 ${pct(base)})` : ""}</span>`
-    + `<span>시장보다 오른 비율 <b>${s.x20.win}%</b></span>`;
+  $("#stats").innerHTML = `<span>지난 2년 이 조건이었다면</span><span>주 <b>${s.per_week}건</b></span>`
+    + `<span>한 달 뒤 시장보다 <b>${pct(s.x20.median)}</b> (중간값)</span>`
+    + `<span>평균 <b>${pct(s.x20.mean)}</b>${base != null ? `, 아무 종목이나 샀다면 ${pct(base)}` : ""}</span>`
+    + `<span>시장보다 오른 종목 <b>${s.x20.win}%</b></span>`;
 }
 
 function renderCond() {
-  const quiet = ["매매가 없던", "매매가 1일 이하였던", "매매가 2일 이하였던"][F.silence];
-  const parts = [`20일간 연기금 ${quiet} 종목을 <b>연기금이 ${F.amount}억 이상</b> 산 날`];
+  const quiet = ["거래가 없던", "거래가 하루 이하였던", "거래가 이틀 이하였던"][F.silence];
   const opts = [];
-  if (F.scale) opts.push("큰 종목 소액 제외");
+  if (F.scale) opts.push("규모 대비 작은 매수 제외");
   if (!F.two_day) opts.push("하루 매수만");
   if (!F.pref) opts.push("우선주 제외");
-  if (F.market) opts.push(F.market);
-  $("#cond").innerHTML = parts.join("") + (opts.length ? ` · ${opts.join(" · ")}` : "");
+  if (F.market) opts.push(`${F.market}만`);
+  $("#cond").innerHTML = `한 달간 ${quiet} 연기금이 <b>${F.amount}억 이상</b> 산 종목이에요`
+    + (opts.length ? ` · ${opts.join(" · ")}` : "");
 }
 
 const PAGE = 30;
@@ -326,7 +326,11 @@ function render() {
   const q = $("#q").value.trim().toLowerCase();
   const list = filtered().filter((s) => !q || s.name.toLowerCase().includes(q) || s.code.includes(q));
   $("#meta").textContent = `${list.length}건${UPDATED}`;
-  if (!list.length) { $("#list").innerHTML = `<div class="empty">${SIGNALS.length ? "결과 없음" : "시그널 없음"}</div>`; return; }
+  if (!list.length) {
+    $("#list").innerHTML = `<div class="empty">${!SIGNALS.length ? "아직 잡힌 종목이 없어요. 평일 오후 4시 10분에 업데이트돼요."
+      : q ? `‘${esc(q)}’에 맞는 종목이 없어요. 필터를 넓혀서 찾아보세요.` : "이 조건에 맞는 종목이 없어요. 넓게나 전체를 눌러 보세요."}</div>`;
+    return;
+  }
   LIST = list; SHOWN = 0;
   $("#list").innerHTML = `<div class="list"></div><div class="more" id="more"></div>`;
   more();
@@ -366,38 +370,39 @@ async function open(key, from) {
   lastFocus = from;
   const s = SIGNALS.find((x) => `${x.code}_${x.date}` === key);
   $("#p-name").textContent = s.name;
-  $("#p-sub").textContent = `${s.code}${s.market ? " · " + s.market : ""} · 신호일 ${+s.date.slice(4, 6)}월 ${+s.date.slice(6, 8)}일`;
+  $("#p-sub").textContent = `${s.code}${s.market ? " · " + s.market : ""} · ${+s.date.slice(4, 6)}월 ${+s.date.slice(6, 8)}일 매수`;
   const ret = s.ret_pct;
   $("#p-body").innerHTML = `
     <div class="kpis">
-      <div class="kpi"><div class="k">연기금 순매수${s.two_day ? " (2일)" : ""}</div><div class="v buy">${fmtEok(s.buy_eok)}</div></div>
-      <div class="kpi"><div class="k">거래대금 대비</div><div class="v">${s.adv_pct != null ? s.adv_pct.toFixed(1) + "%" : "-"}</div><div class="s">20일 평균 거래대금 기준</div></div>
-      <div class="kpi"><div class="k">직전 ${s.lookback || 20}일 최대</div><div class="v">${fmtEok(s.past_max_eok, false)}</div><div class="s">0.3억 초과 ${s.big_days ?? 0}일</div></div>
-      <div class="kpi"><div class="k">신호 후 수익률</div><div class="v ${ret > 0 ? "up" : ret < 0 ? "down" : ""}">${ret != null ? `${ret > 0 ? "+" : ""}${ret.toFixed(1)}%` : "-"}</div><div class="s">${ret != null ? `다음날 시가 매수, ${s.ret_days}거래일` : "다음 거래일부터 계산"}</div></div>
+      <div class="kpi"><div class="k">연기금 순매수</div><div class="v buy">${fmtEok(s.buy_eok)}</div><div class="s">${s.two_day ? "이틀 합계" : "하루"}</div></div>
+      <div class="kpi"><div class="k">평소 거래대금 대비</div><div class="v">${s.adv_pct != null ? s.adv_pct.toFixed(1) + "%" : "-"}</div><div class="s">최근 20거래일 평균 기준</div></div>
+      <div class="kpi"><div class="k">그 전 한 달 가장 큰 거래</div><div class="v">${fmtEok(s.past_max_eok, false)}</div><div class="s">${s.big_days ? `3천만 원 넘는 거래 ${s.big_days}일` : "3천만 원 넘는 거래 없음"}</div></div>
+      <div class="kpi"><div class="k">이후 수익률</div><div class="v ${ret > 0 ? "up" : ret < 0 ? "down" : ""}">${ret != null ? `${ret > 0 ? "+" : ""}${ret.toFixed(1)}%` : "-"}</div><div class="s">${ret != null ? `다음 날 시가 기준 · ${s.ret_days}거래일` : "다음 거래일 장이 끝나면 보여요"}</div></div>
     </div>
-    <div class="state" id="p-state">불러오는 중</div>`;
+    <div class="state" id="p-state">차트를 불러오고 있어요</div>`;
   $("#panel").classList.add("open"); $("#scrim").classList.add("open");
   $("#panel").setAttribute("aria-hidden", "false"); $("#close").focus();
   try {
-    const res = await fetch(`/data/flow/${encodeURIComponent(s.code)}.json`, { cache: "no-cache" });
-    if (!res.ok) throw new Error("차트 데이터 없음");
+    const res = await fetch(`/data/flow/${encodeURIComponent(s.code)}.json`, { cache: "no-cache" }).catch(() => null);
+    if (!res) throw new Error("차트를 불러오지 못했어요. 잠시 후 다시 열어 주세요.");
+    if (!res.ok) throw new Error("이 종목 차트는 아직 없어요. 다음 업데이트 때 생겨요.");
     const rows = (await res.json()).rows.filter((r) => r.close > 0);
     const signalDates = new Set([s.date, ...filtered().filter((x) => x.code === s.code).map((x) => x.date)]);
     CURRENT = { rows, signalDates, v0: 0, v1: rows.length - 1 };
     $("#p-state").outerHTML = `
       <div class="ct"><span class="rng" id="rng"><button data-r="22">1개월</button><button data-r="66">3개월</button><button data-r="0" aria-pressed="true">전체</button></span>
-        <span class="lg"><span><i style="background:var(--buy)"></i>매수</span><span><i style="background:var(--sell)"></i>매도</span><span>▼ 신호</span></span></div>
-      <div class="hint">그래프를 좌우로 드래그하면 그 구간을 확대합니다. 두 번 누르면 전체로 돌아갑니다.</div>
+        <span class="lg"><span><i style="background:var(--buy)"></i>매수</span><span><i style="background:var(--sell)"></i>매도</span><span>▼ 포착일</span></span></div>
+      <div class="hint">드래그하면 확대, 두 번 누르면 전체로 돌아와요</div>
       <div class="ct">연기금 순매수</div>
       <div class="chart" id="c1"></div>
       <div class="ct">종가</div>
       <div class="chart" id="c2"></div>
       <div class="tip" id="tip"></div>
-      <button class="link" id="tg">데이터 보기</button>
-      <div class="dt" id="dt"><table><thead><tr><th>일자</th><th>연기금</th><th>종가</th></tr></thead><tbody>${
+      <button class="link" id="tg">날짜별 숫자 보기</button>
+      <div class="dt" id="dt"><table><thead><tr><th>날짜</th><th>연기금 순매수</th><th>종가</th></tr></thead><tbody>${
         [...rows].reverse().map((r) => `<tr><td>${fmtMd(r.dt)}${signalDates.has(r.dt) ? " ▼" : ""}</td><td>${fmtEok(r.pension)}</td><td>${Math.round(r.close).toLocaleString("ko-KR")}</td></tr>`).join("")
       }</tbody></table></div>`;
-    $("#tg").addEventListener("click", () => { const t = $("#dt"); t.classList.toggle("open"); $("#tg").textContent = t.classList.contains("open") ? "데이터 닫기" : "데이터 보기"; });
+    $("#tg").addEventListener("click", () => { const t = $("#dt"); t.classList.toggle("open"); $("#tg").textContent = t.classList.contains("open") ? "숫자 접기" : "날짜별 숫자 보기"; });
     $("#rng").addEventListener("click", (e) => {
       const b = e.target.closest("button"); if (!b) return;
       const n = +b.dataset.r, last = CURRENT.rows.length - 1;
@@ -437,7 +442,7 @@ function draw(state) {
   const W = b1.clientWidth, n = rows.length, band = (W - M.l - M.r) / n, X = (i) => M.l + i * band;
 
   const H1 = 180, T1 = 14, B1 = 20;
-  const s1 = el("svg", { class: "c", viewBox: `0 0 ${W} ${H1}`, height: H1, role: "img", "aria-label": "연기금 일별 순매수" }, b1);
+  const s1 = el("svg", { class: "c", viewBox: `0 0 ${W} ${H1}`, height: H1, role: "img", "aria-label": "연기금 날짜별 순매수" }, b1);
   const vals = rows.map((r) => r.pension), lo = Math.min(0, ...vals), hi = Math.max(0, ...vals);
   const tk = ticks(lo, hi), yMin = Math.min(lo, tk[0]), yMax = Math.max(hi, tk[tk.length - 1]);
   const y1 = (v) => T1 + (yMax - v) / (yMax - yMin || 1) * (H1 - T1 - B1);
@@ -479,7 +484,7 @@ function draw(state) {
     const r = rows[i], cx = X(i) + band / 2;
     guides.forEach((g) => { g.setAttribute("x1", cx); g.setAttribute("x2", cx); g.setAttribute("visibility", "visible"); });
     dot.setAttribute("cx", cx); dot.setAttribute("cy", y2(r.close)); dot.setAttribute("visibility", "visible");
-    tip.innerHTML = `<b>${fmtMd(r.dt)}${signalDates.has(r.dt) ? " · 신호" : ""}</b><span>연기금 ${fmtEok(r.pension)}</span><span>종가 ${fmtWon(r.close)}</span>`;
+    tip.innerHTML = `<b>${fmtMd(r.dt)}${signalDates.has(r.dt) ? " · 포착일" : ""}</b><span>연기금 ${fmtEok(r.pension)}</span><span>종가 ${fmtWon(r.close)}</span>`;
     tip.style.display = "block";
     const bb = body.getBoundingClientRect();
     let left = e.clientX - bb.left + 12; if (left + tip.offsetWidth > bb.width - 8) left = e.clientX - bb.left - tip.offsetWidth - 12;
@@ -523,7 +528,7 @@ function axis(svg, rows, X, band, y) {
   rows.forEach((r, i) => { if (i % every === 0) el("text", { x: X(i) + band / 2, y, "text-anchor": "middle" }, svg).textContent = fmtMd(r.dt); });
 }
 
-load().catch(() => { $("#list").innerHTML = `<div class="empty">불러오지 못했습니다</div>`; });
+load().catch(() => { $("#list").innerHTML = `<div class="empty">목록을 불러오지 못했어요. 잠시 후 새로고침해 주세요.</div>`; });
 </script>
 </body>
 </html>
