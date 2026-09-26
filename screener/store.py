@@ -28,7 +28,24 @@ def upsert(signals: List[dict]) -> int:
     SIGNALS_PATH.parent.mkdir(parents=True, exist_ok=True)
     rows = sorted(data.values(), key=lambda s: (s["date"], s["buy_eok"]), reverse=True)
     SIGNALS_PATH.write_text("[\n" + ",\n".join(json.dumps(r, ensure_ascii=False) for r in rows) + "\n]\n")
+    write_csv(rows)
     return len(signals)
+
+
+def write_csv(rows: List[dict]) -> None:
+    """Google Sheets 가 IMPORTDATA 로 읽는 운영 시그널 기록 (public/data/signals.csv)."""
+    import csv
+    cols = [("신호일", "date"), ("종목코드", "code"), ("종목명", "name"), ("시장", "market"),
+            ("연기금 순매수(억)", "buy_eok"), ("직전 최대(억)", "past_max_eok"), ("구분", "source"),
+            ("장중 선행", "intraday"), ("갱신", "updated_at")]
+    with (SIGNALS_PATH.parent / "signals.csv").open("w", newline="", encoding="utf-8") as f:
+        w = csv.writer(f)
+        w.writerow([c for c, _ in cols])
+        for r in rows:
+            d = str(r.get("date", ""))
+            vals = [r.get(k, "") for _, k in cols[1:]]
+            vals[0] = f"A{vals[0]}"  # IMPORTDATA 가 앞자리 0 을 지우지 않게
+            w.writerow([f"{d[:4]}-{d[4:6]}-{d[6:]}"] + vals)
 
 
 def universe_meta() -> Dict[str, dict]:
