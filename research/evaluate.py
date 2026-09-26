@@ -202,12 +202,14 @@ def burst(f: Feat, k: int) -> np.ndarray:
 
 
 def rule(min_eok=1.0, adv_pct=None, cap_bp=None, quiet="maxabs", quiet_eok=0.3, ratio=None,
-         L=20, k=1, big_days=None, min_adv_eok=None) -> Callable[[Feat], np.ndarray]:
+         L=20, k=1, big_days=None, min_adv_eok=None, adv_unless_eok=None) -> Callable[[Feat], np.ndarray]:
     """급증(크기) 조건 + 침묵 조건 조합."""
     def f(x: Feat) -> np.ndarray:
         s = burst(x, k)
         m = x.valid & (s >= min_eok * EOK)
-        if adv_pct is not None:
+        if adv_pct is not None and adv_unless_eok is not None:  # 큰 금액은 거래대금 조건 면제
+            m &= (s >= adv_unless_eok * EOK) | (s >= adv_pct / 100 * x.adv20)
+        elif adv_pct is not None:
             m &= s >= adv_pct / 100 * x.adv20
         if cap_bp is not None:
             m &= s >= cap_bp / 1e4 * x.p.mcap
@@ -241,10 +243,13 @@ def events(f: Feat, mask: np.ndarray) -> pd.DataFrame:
         "t": t, "date": p.dates[t], "code": p.codes[c], "name": p.names[c],
         "market": np.where(p.market[c] == "STK", "코스피", "코스닥"),
         "net_eok": np.round(p.net[t, c] / EOK, 2),
+        "buy2_eok": np.round(burst(f, 2)[t, c] / EOK, 2),
         "adv20_eok": np.round(f.adv20[t, c] / EOK, 2),
-        "net_adv_pct": np.round(p.net[t, c] / f.adv20[t, c] * 100, 1),
+        "net_adv_pct": np.round(np.maximum(p.net[t, c], burst(f, 2)[t, c]) / f.adv20[t, c] * 100, 1),
         "mcap_eok": np.round(p.mcap[t, c] / EOK, 0),
-        "past_max_eok": np.round(past(f, "maxabs", 20)[t, c] / EOK, 2),
+        # 2일 누적 신호(전날도 0.3억 초과)는 전날을 뺀 그 이전 20일로 표시
+        "past_max_eok": np.round(np.where(np.abs(p.net[np.maximum(t - 1, 0), c]) > 0.3 * EOK,
+                                          past(f, "maxabs", 20, 2)[t, c], past(f, "maxabs", 20)[t, c]) / EOK, 2),
         "pref": np.array([s[-1] != "0" for s in p.codes[c]]),
     })
     for (entry, h), arr in f.fwd.items():
@@ -290,9 +295,12 @@ def summarize(name: str, ev: pd.DataFrame, weeks: float, split_t: int, entry="T+
 
 # ---------------------------------------------------------------- experiments
 
+RECOMMENDED = "추천: 1~2일 누적 3억↑ & (5억↑ 또는 거래대금 5%↑) & 직전 20일 매일 |순매수|≤0.3억"
+CURRENT = "현재: 3억↑ & 20일 매일 |순매수|≤0.3억"
+
 EXPERIMENTS: List[tuple] = [
     # (그룹, 이름, 규칙)
-    ("0 기준", "현재: 3억↑ & 20일 매일 |순매수|≤0.3억", rule(min_eok=3)),
+    ("0 기준", CURRENT, rule(min_eok=3)),
     ("0 기준", "대조군: 1억↑ & 거래대금5%↑ (침묵조건 없음)", rule(adv_pct=5, quiet=None)),
     ("1 급증 크기", "1억↑ (침묵 현재와 동일)", rule(min_eok=1)),
     ("1 급증 크기", "1억↑ & 거래대금 2%↑", rule(adv_pct=2)),
@@ -323,6 +331,7 @@ EXPERIMENTS: List[tuple] = [
     ("6 금액 유지·침묵 완화", "3억↑ & 10일 매일 |순매수|≤0.3억", rule(min_eok=3, L=10)),
     ("6 금액 유지·침묵 완화", "2일 누적 3억↑ & 그 전 20일 매일 |순매수|≤0.3억", rule(min_eok=3, k=2)),
     ("6 금액 유지·침묵 완화", "3억↑ & 거래대금 5%↑ & 20일 매일 |순매수|≤0.3억", rule(min_eok=3, adv_pct=5)),
+    ("7 추천", RECOMMENDED, rule(min_eok=3, k=2, adv_pct=5, adv_unless_eok=5)),
 ]
 
 

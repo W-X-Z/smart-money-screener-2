@@ -2,9 +2,8 @@
 
 탭:
   요약                 입력값(기간·주 수)과, 두 시그널 탭을 참조하는 수식으로 계산한 비교표
-  추천 로직 시그널     추천 로직의 이벤트별 데이터
-  현재 로직 시그널     현재 운영 로직의 이벤트별 데이터
-  로직 비교            모든 변형의 결과 (research/evaluate.py 계산값)
+  추천 로직 시그널     추천 로직의 이벤트별 데이터 (요약의 추천 로직 행이 이 탭을 수식으로 집계)
+  로직 비교            모든 변형의 결과 (research/evaluate.py 계산값, 요약의 현재 로직 행이 참조)
   Data Sources         데이터 출처
 
 사용법:
@@ -32,11 +31,9 @@ EOK = '#,##0.0'
 MAX_ROW = 2000
 
 SIGNAL_COLS = [
-    ("신호일", 12), ("종목코드", 10), ("종목명", 18), ("시장", 8),
-    ("연기금 순매수(억)", 14), ("20일 평균 거래대금(억)", 16), ("거래대금 대비 순매수", 16),
-    ("시가총액(억)", 12), ("직전 20일 최대 |순매수|(억)", 18),
-    ("5일 초과수익", 12), ("10일 초과수익", 12), ("20일 초과수익", 12), ("20일 절대수익", 12),
-    ("20일 초과수익 (당일 종가 진입)", 20),
+    ("신호일", 11), ("종목코드", 9), ("종목명", 16), ("시장", 7),
+    ("연기금 순매수(억, 1~2일 누적)", 16), ("20일 평균 거래대금(억)", 14), ("거래대금 대비 순매수", 13),
+    ("직전 20일 최대 |순매수|(억)", 15), ("5일 초과수익", 11), ("20일 초과수익", 11),
 ]
 
 
@@ -60,19 +57,15 @@ def signal_sheet(wb, title, ev: pd.DataFrame, run_at: str):
     ev = ev.sort_values("date", ascending=False)
     for r, e in enumerate(ev.itertuples(index=False), 2):
         d = str(e.date)
+        amt = max(e.net_eok, e.buy2_eok)
         vals = [f"{d[:4]}-{d[4:6]}-{d[6:]}", str(e.code), e.name, e.market,
-                e.net_eok, e.adv20_eok, f"=IF(F{r}=0,0,E{r}/F{r})", e.mcap_eok, e.past_max_eok]
-        rets = [getattr(e, "x5_T1시가"), getattr(e, "x10_T1시가"), getattr(e, "x20_T1시가"),
-                getattr(e, "r20_T1시가"), getattr(e, "x20_T종가")]
-        vals += [None if pd.isna(v) else v / 100 for v in rets]
+                amt, e.adv20_eok, f"=IF(F{r}=0,0,E{r}/F{r})", e.past_max_eok]
+        vals += [None if pd.isna(v) else round(v / 100, 4) for v in (e.x5_T1, e.x20_T1)]
         for col, v in enumerate(vals, 1):
             c = ws.cell(row=r, column=col, value=v)
-            c.font = BODY_FONT
-            if col in (5, 6, 9):
+            if col in (5, 6, 8):
                 c.number_format = EOK
-            elif col == 8:
-                c.number_format = "#,##0"
-            elif col >= 7 and col != 8:
+            elif col >= 7:
                 c.number_format = PCT
     ws.freeze_panes = "D2"
     return ws
@@ -89,15 +82,14 @@ def main() -> None:
     meta = json.loads((RESULTS / "meta.json").read_text())
     events = pd.read_pickle(RESULTS / "events.pkl")
     variants = pd.read_csv(RESULTS / "variants.csv")
-    for name in (args.current, args.recommended):
+    for name in (args.recommended,):
         ev = events[name]
         # itertuples 는 한글·특수문자 컬럼명을 바꾸므로 사용할 컬럼만 영문으로 정리
-        events[name] = ev.rename(columns={
-            "x5_T+1시가": "x5_T1시가", "x10_T+1시가": "x10_T1시가", "x20_T+1시가": "x20_T1시가",
-            "r20_T+1시가": "r20_T1시가"})
+        events[name] = ev.rename(columns={"x5_T+1시가": "x5_T1", "x20_T+1시가": "x20_T1"})
     run_at = meta["generated"].replace("T", " ")
 
     wb = Workbook()
+    wb._named_styles["Normal"].font = Font(name=FONT, size=10)
     ws = wb.active
     ws.title = "요약"
     ws["A1"] = "연기금 시그널 로직 검증"
@@ -123,14 +115,18 @@ def main() -> None:
             "20일 초과수익 중앙값", "20일 승률 (초과수익>0)"]
     header(ws, 10, cols, [34, 10, 12, 16, 16, 16, 16])
     ws.row_dimensions[10].height = 32
-    for r, (label, tab) in enumerate((("현재 로직", "현재 로직 시그널"), ("추천 로직", "추천 로직 시그널")), 11):
-        rng = lambda col: f"'{tab}'!{col}2:{col}{MAX_ROW}"  # noqa: E731
-        row = [label, f"=COUNTA({rng('A')})", f"=IF($B$8=0,0,B{r}/$B$8)",
-               f"=MEDIAN({rng('J')})", f"=AVERAGE({rng('L')})", f"=MEDIAN({rng('L')})",
-               f"=IF(COUNT({rng('L')})=0,0,COUNTIF({rng('L')},\">0\")/COUNT({rng('L')}))"]
+    # 현재 로직: '로직 비교' 탭에서 찾아옴 (% 단위 -> 비율)
+    look = lambda col: f"INDEX('로직 비교'!{col}:{col},MATCH($B$15,'로직 비교'!B:B,0))"  # noqa: E731
+    cur = ["현재 로직", f"={look('C')}", f"={look('D')}", f"={look('E')}/100", f"={look('F')}/100",
+           f"={look('G')}/100", f"={look('H')}/100"]
+    # 추천 로직: 시그널 탭을 직접 집계
+    rng = lambda col: f"'추천 로직 시그널'!{col}2:{col}{MAX_ROW}"  # noqa: E731
+    rec = ["추천 로직", f"=COUNTA({rng('A')})", "=IF($B$8=0,0,B12/$B$8)",
+           f"=MEDIAN({rng('I')})", f"=AVERAGE({rng('J')})", f"=MEDIAN({rng('J')})",
+           f"=IF(COUNT({rng('J')})=0,0,COUNTIF({rng('J')},\">0\")/COUNT({rng('J')}))"]
+    for r, row in ((11, cur), (12, rec)):
         for col, v in enumerate(row, 1):
             c = ws.cell(row=r, column=col, value=v)
-            c.font = BODY_FONT
             c.number_format = {2: "0", 3: "0.0"}.get(col, PCT)
     ws["A14"] = "로직 정의"
     ws["A14"].font = Font(name=FONT, bold=True)
@@ -142,10 +138,11 @@ def main() -> None:
     ws["A18"].font = Font(name=FONT, italic=True, color="555555")
 
     signal_sheet(wb, "추천 로직 시그널", events[args.recommended], run_at)
-    signal_sheet(wb, "현재 로직 시그널", events[args.current], run_at)
 
     wv = wb.create_sheet("로직 비교")
-    keep = [c for c in variants.columns if c not in ("종목수",)]
+    keep = [c for c in ["그룹", "로직", "신호수", "주당", "5일 초과 중앙%", "20일 초과 평균%", "20일 초과 중앙%", "20일 승률%",
+                        "20일 평균 95%구간", "과거 1년 신호수", "과거 1년 20일 중앙%", "최근 1년 신호수", "최근 1년 20일 중앙%"]
+            if c in variants.columns]
     header(wv, 1, keep, [12, 46] + [13] * (len(keep) - 2))
     wv.row_dimensions[1].height = 44
     wv["A1"].comment = Comment(
@@ -162,14 +159,11 @@ def main() -> None:
                "Run at", "Requested by", "Row count", "Changes after retrieval", "Notes"]
     header(wd, 1, ds_cols, [26, 22, 40, 22, 40, 34, 18, 14, 10, 30, 30])
     period = f"{meta['from']}~{meta['to']}"
-    n_rec, n_cur = len(events[args.recommended]), len(events[args.current])
+    n_rec = len(events[args.recommended])
     rows = [
-        [f"'추천 로직 시그널'!A1:N{n_rec + 1}", "KRX 정보데이터시스템", "MDCSTAT02401 (투자자별 순매수상위종목, 연기금), MDCSTAT01501 (전종목 시세)",
+        [f"'추천 로직 시그널'!A1:J{n_rec + 1}", "KRX 정보데이터시스템", "MDCSTAT02401 (투자자별 순매수상위종목, 연기금), MDCSTAT01501 (전종목 시세)",
          "GitHub Actions research-archive -> research/evaluate.py", "연기금 로직 개선안 검증", f"기간 {period}, 코스피·코스닥",
          run_at, "사용자", n_rec, "추천 로직 조건으로 필터, 20거래일 재신호 제외, 수익률 계산", ""],
-        [f"'현재 로직 시그널'!A1:N{n_cur + 1}", "KRX 정보데이터시스템", "MDCSTAT02401, MDCSTAT01501",
-         "GitHub Actions research-archive -> research/evaluate.py", "연기금 로직 개선안 검증", f"기간 {period}, 코스피·코스닥",
-         run_at, "사용자", n_cur, "현재 로직 조건으로 필터, 수익률 계산", ""],
         [f"'로직 비교'!A1:{get_column_letter(len(keep))}{len(variants) + 1}", "research/evaluate.py", "research/results/variants.csv",
          "Run by Claude", "연기금 로직 개선안 검증", f"기간 {period}", run_at, "사용자", len(variants), "없음", ""],
     ]
