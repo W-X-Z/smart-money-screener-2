@@ -1,0 +1,59 @@
+name: research-archive
+
+on:
+  workflow_dispatch:
+    inputs:
+      from:
+        description: "시작일 YYYYMMDD"
+        required: true
+      to:
+        description: "종료일 YYYYMMDD"
+        required: true
+      max_minutes:
+        description: "최대 수집 시간(분). 넘으면 저장 후 종료, 재실행 시 이어서 수집"
+        required: false
+        default: "50"
+
+permissions:
+  contents: write
+
+concurrency:
+  group: signals-commit
+  cancel-in-progress: false
+
+jobs:
+  collect:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - run: pip install -r research/requirements.txt
+
+      - name: Collect archive
+        env:
+          KRX_ID: ${{ secrets.KRX_ID }}
+          KRX_PW: ${{ secrets.KRX_PW }}
+          FROM: ${{ inputs.from }}
+          TO: ${{ inputs.to }}
+          MAX_MINUTES: ${{ inputs.max_minutes }}
+        run: |
+          [[ "$FROM" =~ ^[0-9]{8}$ && "$TO" =~ ^[0-9]{8}$ ]] || { echo "잘못된 날짜"; exit 1; }
+          [[ "$MAX_MINUTES" =~ ^[0-9]+$ ]] || MAX_MINUTES=50
+          python -m research.collect --from "$FROM" --to "$TO" --max-minutes "$MAX_MINUTES"
+
+      - name: Commit archive
+        if: always()
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add research/archive
+          if git diff --cached --quiet; then echo "변경 없음"; exit 0; fi
+          git commit -m "연구용 아카이브 $FROM~$TO"
+          git pull --rebase
+          git push
+        env:
+          FROM: ${{ inputs.from }}
+          TO: ${{ inputs.to }}
