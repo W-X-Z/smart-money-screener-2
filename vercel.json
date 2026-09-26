@@ -14,5 +14,5 @@
       ]
     }
   ],
-  "ignoreCommand": "git diff --quiet HEAD^ HEAD -- public/ vercel.json"
+  "ignoreCommand": "if [ -n \"$VERCEL_GIT_PREVIOUS_SHA\" ]; then git diff --quiet \"$VERCEL_GIT_PREVIOUS_SHA\" HEAD -- public/ vercel.json; else git diff --quiet HEAD^ HEAD -- public/ vercel.json; fi"
 }
