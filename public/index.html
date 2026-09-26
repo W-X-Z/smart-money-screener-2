@@ -56,7 +56,7 @@ header { display: flex; align-items: baseline; justify-content: space-between; g
 h1 { font-size: 22px; font-weight: 700; letter-spacing: -0.02em; margin: 0; }
 .meta { color: var(--text-3); font-size: 13px; white-space: nowrap; }
 
-.toolbar { display: flex; gap: 8px; margin-bottom: 10px; align-items: center; }
+.toolbar { display: flex; gap: 8px; margin-bottom: 16px; align-items: center; }
 .seg { display: inline-flex; background: var(--control); border-radius: 10px; padding: 3px; flex: none; }
 .seg button { border: 0; background: none; padding: 6px 12px; border-radius: 8px; font-size: 14px; color: var(--text-2); cursor: pointer; white-space: nowrap; }
 .seg.sm button { padding: 5px 10px; font-size: 13px; }
@@ -76,16 +76,21 @@ h1 { font-size: 22px; font-weight: 700; letter-spacing: -0.02em; margin: 0; }
 .switch:checked { background: var(--focus); }
 .switch:checked::after { transform: translateX(16px); }
 .switch:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
-.cond { font-size: 14px; color: var(--text-2); margin: 2px 2px 4px; }
-.cond b { color: var(--text); font-weight: 600; }
-.stats { display: flex; flex-wrap: wrap; gap: 4px 14px; font-size: 13px; color: var(--text-3); margin: 0 2px 16px; font-variant-numeric: tabular-nums; }
-.stats b { color: var(--text-2); font-weight: 600; }
+.info { border: 0; background: none; padding: 0 2px; margin-left: 2px; cursor: pointer; color: var(--text-3); vertical-align: -3px; line-height: 0; }
+.info svg { width: 15px; height: 15px; stroke: currentColor; }
+.info[aria-expanded="true"] { color: var(--text); }
+.pop { position: fixed; z-index: 20; max-width: 260px; background: var(--text); color: var(--bg); font-size: 13px; line-height: 1.5; padding: 9px 12px; border-radius: 10px; box-shadow: var(--shadow); display: none; }
+.pop.open { display: block; }
+[hidden] { display: none !important; }
+.fstats { font-size: 13px; color: var(--text-3); font-variant-numeric: tabular-nums; }
+.fstats b { color: var(--text); font-weight: 600; }
+.coach { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); background: var(--text); color: var(--bg); font-size: 13px; padding: 7px 12px; border-radius: 999px; pointer-events: none; white-space: nowrap; opacity: .92; transition: opacity .4s; }
+.coach.hide { opacity: 0; }
 .pill.mute { color: var(--text-3); }
 .more { text-align: center; color: var(--text-3); font-size: 13px; padding: 16px 0; }
 .ct .rng { display: inline-flex; gap: 2px; font-weight: 500; }
 .rng button { border: 0; background: none; font-size: 12px; color: var(--text-3); padding: 3px 8px; border-radius: 6px; cursor: pointer; }
 .rng button[aria-pressed="true"] { background: var(--control); color: var(--text); }
-.hint { font-size: 12px; color: var(--text-3); margin: -8px 0 12px; }
 svg.c { touch-action: pan-y; user-select: none; -webkit-user-select: none; cursor: crosshair; }
 .v.up { color: var(--buy); }
 .v.down { color: var(--sell); }
@@ -192,19 +197,17 @@ svg.c text { fill: var(--text-3); font-size: 11px; font-family: inherit; }
   </div>
 
   <div class="fcard" id="fcard">
-    <div class="frow"><div class="lbl">연기금 매수 금액<small>이틀 연속 샀다면 합계</small></div>
+    <div class="frow"><div class="lbl">연기금 매수 금액<i data-tip="이틀 연속 샀다면 두 날을 합쳐요."></i></div>
       <div class="seg sm" data-f="amount" role="group" aria-label="연기금 매수 금액"><button data-v="1">1억 이상</button><button data-v="3">3억 이상</button><button data-v="5">5억 이상</button></div></div>
-    <div class="frow"><div class="lbl">사기 전 한 달간 연기금 거래<small>3천만 원 넘게 사고판 날 (20거래일)</small></div>
+    <div class="frow"><div class="lbl">사기 전 한 달간 연기금 거래<i data-tip="매수일 전 20거래일 중 연기금이 3천만 원 넘게 사고판 날 수예요."></i></div>
       <div class="seg sm" data-f="silence" role="group" aria-label="사기 전 한 달간 연기금 거래"><button data-v="0">없음</button><button data-v="1">하루까지</button><button data-v="2">이틀까지</button></div></div>
-    <div class="frow"><div class="lbl">종목 규모에 비해 작은 매수 빼기<small>5억 미만은 평소 하루 거래대금의 5%를 넘을 때만 보여요</small></div><input type="checkbox" class="switch" data-f="scale" aria-label="종목 규모에 비해 작은 매수 빼기"></div>
+    <div class="frow"><div class="lbl">규모에 비해 작은 매수 빼기<i data-tip="5억 미만 매수는 평소 하루 거래대금의 5%를 넘을 때만 보여요."></i></div><input type="checkbox" class="switch" data-f="scale" aria-label="규모에 비해 작은 매수 빼기"></div>
     <div class="frow"><div class="lbl">이틀 연속 산 종목도 보기</div><input type="checkbox" class="switch" data-f="two_day" aria-label="이틀 연속 산 종목도 보기"></div>
     <div class="frow"><div class="lbl">우선주도 보기</div><input type="checkbox" class="switch" data-f="pref" aria-label="우선주도 보기"></div>
     <div class="frow"><div class="lbl">시장</div>
       <div class="seg sm" data-f="market" role="group" aria-label="시장"><button data-v="">전체</button><button data-v="코스피">코스피</button><button data-v="코스닥">코스닥</button></div></div>
+    <div class="frow fstats" id="stats"></div>
   </div>
-
-  <div class="cond" id="cond"></div>
-  <div class="stats" id="stats"></div>
 
   <main id="list"><div class="empty">불러오고 있어요</div></main>
 </div>
@@ -217,6 +220,7 @@ svg.c text { fill: var(--text-3); font-size: 11px; font-family: inherit; }
   </div>
   <div class="panel-b" id="p-body"></div>
 </aside>
+<div class="pop" id="pop" role="status"></div>
 
 <script>
 const $ = (s) => document.querySelector(s);
@@ -227,6 +231,24 @@ const fmtEok = (v, sign = true) => `${sign && v > 0 ? "+" : ""}${+v.toFixed(Math
 const fmtWon = (v) => `${Math.round(v).toLocaleString("ko-KR")}원`;
 const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
 const CHEV = `<svg class="chev" viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round"><path d="m9 6 6 6-6 6"/></svg>`;
+
+// ---------- 토글팁 ⓘ: 눌러서 열고, 바깥·Esc·스크롤로 닫힌다 (터치에서도 동작) ----------
+const INFO_SVG = `<svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M12 11v5M12 8h.01"/></svg>`;
+const info = (text) => `<button type="button" class="info" aria-label="설명 보기" aria-expanded="false" data-tip="${esc(text)}">${INFO_SVG}</button>`;
+document.querySelectorAll("i[data-tip]").forEach((n) => { n.outerHTML = info(n.dataset.tip); });
+let tipFor = null;
+function hidePop() { $("#pop").classList.remove("open"); if (tipFor) tipFor.setAttribute("aria-expanded", "false"); tipFor = null; }
+document.addEventListener("click", (e) => {
+  const b = e.target.closest(".info");
+  if (!b || b === tipFor) return hidePop();
+  hidePop(); tipFor = b; b.setAttribute("aria-expanded", "true");
+  const pop = $("#pop"); pop.textContent = b.dataset.tip; pop.classList.add("open");
+  const r = b.getBoundingClientRect(), w = pop.offsetWidth, h = pop.offsetHeight;
+  pop.style.left = `${Math.max(8, Math.min(innerWidth - w - 8, r.left + r.width / 2 - w / 2))}px`;
+  pop.style.top = `${r.bottom + 8 + h > innerHeight ? r.top - h - 8 : r.bottom + 8}px`;
+});
+addEventListener("scroll", hidePop, true);
+addEventListener("resize", hidePop);
 
 const PRESETS = {
   추천: { amount: 3, silence: 0, scale: true, two_day: true, pref: true },
@@ -280,25 +302,14 @@ function syncControls() {
 function renderStats() {
   const key = `a${F.amount}_s${F.silence}_r${+F.scale}_d${+F.two_day}_p${+F.pref}`;
   const s = STATS && STATS.stats[key];
-  if (!s || !s.x20) { $("#stats").innerHTML = ""; return; }
+  $("#stats").hidden = !(s && s.x20); if (!s || !s.x20) return;
   const pct = (v) => `${v > 0 ? "+" : ""}${v.toFixed(1)}%`;
   const base = STATS.baseline && STATS.baseline.x20 ? STATS.baseline.x20.mean : null;
-  $("#stats").innerHTML = `<span>지난 2년 이 조건이었다면</span><span>주 <b>${s.per_week}건</b></span>`
-    + `<span>한 달 뒤 시장보다 <b>${pct(s.x20.median)}</b> (중간값)</span>`
-    + `<span>평균 <b>${pct(s.x20.mean)}</b>${base != null ? `, 아무 종목이나 샀다면 ${pct(base)}` : ""}</span>`
-    + `<span>시장보다 오른 종목 <b>${s.x20.win}%</b></span>`;
+  const more = `지난 2년 기준이에요. 다음 날 시가에 사서 한 달(20거래일) 뒤 같은 시장·비슷한 시총 종목과 비교한 중간값이에요. `
+    + `평균 ${pct(s.x20.mean)}${base != null ? ` (아무 종목이나 샀다면 ${pct(base)})` : ""}, 시장보다 오른 종목 ${s.x20.win}%.`;
+  $("#stats").innerHTML = `<span>이 조건이면 주 <b>${s.per_week}건</b> · 한 달 뒤 시장보다 <b>${pct(s.x20.median)}</b>${info(more)}</span>`;
 }
 
-function renderCond() {
-  const quiet = ["거래가 없던", "거래가 하루 이하였던", "거래가 이틀 이하였던"][F.silence];
-  const opts = [];
-  if (F.scale) opts.push("규모 대비 작은 매수 제외");
-  if (!F.two_day) opts.push("하루 매수만");
-  if (!F.pref) opts.push("우선주 제외");
-  if (F.market) opts.push(`${F.market}만`);
-  $("#cond").innerHTML = `한 달간 ${quiet} 연기금이 <b>${F.amount}억 이상</b> 산 종목이에요`
-    + (opts.length ? ` · ${opts.join(" · ")}` : "");
-}
 
 const PAGE = 30;
 let LIST = [], SHOWN = 0;
@@ -321,7 +332,6 @@ function more() {
 const io = new IntersectionObserver((es) => { if (es.some((e) => e.isIntersecting)) more(); }, { rootMargin: "400px" });
 
 function render() {
-  renderCond();
   renderStats();
   const q = $("#q").value.trim().toLowerCase();
   const list = filtered().filter((s) => !q || s.name.toLowerCase().includes(q) || s.code.includes(q));
@@ -363,7 +373,7 @@ function close() {
 }
 $("#close").addEventListener("click", close);
 $("#scrim").addEventListener("click", close);
-document.addEventListener("keydown", (e) => { if (e.key === "Escape") close(); });
+document.addEventListener("keydown", (e) => { if (e.key !== "Escape") return; if (tipFor) hidePop(); else close(); });
 window.addEventListener("resize", () => { if (CURRENT) draw(CURRENT); });
 
 async function open(key, from) {
@@ -374,10 +384,10 @@ async function open(key, from) {
   const ret = s.ret_pct;
   $("#p-body").innerHTML = `
     <div class="kpis">
-      <div class="kpi"><div class="k">연기금 순매수</div><div class="v buy">${fmtEok(s.buy_eok)}</div><div class="s">${s.two_day ? "이틀 합계" : "하루"}</div></div>
-      <div class="kpi"><div class="k">평소 거래대금 대비</div><div class="v">${s.adv_pct != null ? s.adv_pct.toFixed(1) + "%" : "-"}</div><div class="s">최근 20거래일 평균 기준</div></div>
-      <div class="kpi"><div class="k">그 전 한 달 가장 큰 거래</div><div class="v">${fmtEok(s.past_max_eok, false)}</div><div class="s">${s.big_days ? `3천만 원 넘는 거래 ${s.big_days}일` : "3천만 원 넘는 거래 없음"}</div></div>
-      <div class="kpi"><div class="k">이후 수익률</div><div class="v ${ret > 0 ? "up" : ret < 0 ? "down" : ""}">${ret != null ? `${ret > 0 ? "+" : ""}${ret.toFixed(1)}%` : "-"}</div><div class="s">${ret != null ? `다음 날 시가 기준 · ${s.ret_days}거래일` : "다음 거래일 장이 끝나면 보여요"}</div></div>
+      <div class="kpi"><div class="k">연기금 순매수</div><div class="v buy">${fmtEok(s.buy_eok)}</div>${s.two_day ? `<div class="s">이틀 합계</div>` : ""}</div>
+      <div class="kpi"><div class="k">평소 거래대금 대비${info("최근 20거래일 하루 평균 거래대금과 비교했어요.")}</div><div class="v">${s.adv_pct != null ? s.adv_pct.toFixed(1) + "%" : "-"}</div></div>
+      <div class="kpi"><div class="k">그 전 한 달 최대 거래${info(`매수일 전 20거래일 중 하루 거래가 가장 컸던 금액이에요. 3천만 원 넘은 날은 ${s.big_days ? `${s.big_days}일` : "없어요"}.`)}</div><div class="v">${fmtEok(s.past_max_eok, false)}</div></div>
+      <div class="kpi"><div class="k">이후 수익률${info("다음 날 시가에 샀다고 보고 마지막 종가까지 계산했어요.")}</div><div class="v ${ret > 0 ? "up" : ret < 0 ? "down" : ""}">${ret != null ? `${ret > 0 ? "+" : ""}${ret.toFixed(1)}%` : "-"}</div><div class="s">${ret != null ? `${s.ret_days}거래일째` : "다음 거래일 장 마감 후 보여요"}</div></div>
     </div>
     <div class="state" id="p-state">차트를 불러오고 있어요</div>`;
   $("#panel").classList.add("open"); $("#scrim").classList.add("open");
@@ -392,7 +402,6 @@ async function open(key, from) {
     $("#p-state").outerHTML = `
       <div class="ct"><span class="rng" id="rng"><button data-r="22">1개월</button><button data-r="66">3개월</button><button data-r="0" aria-pressed="true">전체</button></span>
         <span class="lg"><span><i style="background:var(--buy)"></i>매수</span><span><i style="background:var(--sell)"></i>매도</span><span>▼ 포착일</span></span></div>
-      <div class="hint">드래그하면 확대, 두 번 누르면 전체로 돌아와요</div>
       <div class="ct">연기금 순매수</div>
       <div class="chart" id="c1"></div>
       <div class="ct">종가</div>
@@ -408,10 +417,19 @@ async function open(key, from) {
       const n = +b.dataset.r, last = CURRENT.rows.length - 1;
       CURRENT.v0 = n ? Math.max(0, last - n + 1) : 0; CURRENT.v1 = last; draw(CURRENT);
     });
-    requestAnimationFrame(() => draw(CURRENT));
+    requestAnimationFrame(() => { draw(CURRENT); coachOnce(); });
   } catch (err) {
     const st = $("#p-state"); if (st) st.textContent = err.message;
   }
+}
+
+// 드래그 확대는 보이지 않는 제스처라 처음 한 번만 알려준다
+function coachOnce() {
+  try { if (localStorage.getItem("seen-zoom")) return; localStorage.setItem("seen-zoom", "1"); } catch (e) { return; }
+  const c = document.createElement("div"); c.className = "coach"; c.textContent = "드래그하면 구간을 확대해요";
+  $("#c1").appendChild(c);
+  const off = () => { c.classList.add("hide"); setTimeout(() => c.remove(), 400); };
+  setTimeout(off, 3500); $("#c1").addEventListener("pointerdown", off, { once: true });
 }
 
 // ---------- charts (SVG, 한 축씩: 막대 + 선 분리) ----------
