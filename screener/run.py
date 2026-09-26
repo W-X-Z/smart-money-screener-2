@@ -1,155 +1,86 @@
-"""연기금 '침묵 후 급증' 장중 스크리너 v0.
+"""장중 스캔: 키움 장중 잠정치(오늘) + 아카이브(어제까지 확정치)로 일배치와 같은 규칙의 시그널을 찾는다.
 
-1) 장중 잠정치(ka10063)에서 오늘 연기금 순매수 >= MIN_BUY 인 종목을 후보로 뽑고
-2) 후보마다 과거 일별 연기금 수급(ka10059)을 조회해
-3) 직전 LOOKBACK 거래일 동안 |연기금 순매수| 가 모두 QUIET_MAX 이하였던 종목만 신호로 출력한다.
+1) git pull 로 최신 아카이브를 받고
+2) 키움 ka10063 에서 오늘 연기금 잠정 순매수(연기금이 매매한 전 종목) 조회
+3) engine/signals.py 로 시그널 속성 계산 (기본 포착 = '넓게', 웹 필터가 같은 규칙으로 좁혀 봄)
+4) public/data/signals.json 에 '장중 HH:MM' 으로 저장, --push 면 커밋·푸시해 웹 반영
+장 마감 후 일배치가 확정치로 다시 계산하면 '장중 → 확정' 으로 표시가 바뀐다.
 
-사용법:
-    python -m screener.run
-    python -m screener.run --min-buy 300 --lookback 20 --quiet-max 30
-금액 단위는 모두 백만원 (300 = 3억).
+사용법 (Mac, 키움 등록 IP):
+    python -m screener.run            # 스캔 + 저장
+    python -m screener.run --push     # 스캔 + 저장 + 커밋·푸시
 """
 
 import argparse
-import csv
-import json
+import subprocess
 from datetime import datetime
-from pathlib import Path
 
+from batch.daily import passes, records, write_flows
+from engine import signals as S
+from engine.archive import load
 from screener import store
-from screener.kiwoom import NON_STOCK, ROOT, Kiwoom, num
+from screener.kiwoom import ROOT, Kiwoom, num
 
-OUT_DIR = ROOT / "output"
-PENSION_INVSR = "3"  # ka10063 투자자 구분 중 연기금으로 추정되는 코드 (verify_pension_code 로 확인)
+PENSION_INVSR = "3"  # ka10063 투자자 구분 중 연기금 (ka10065 연기금 상위와 대조해 확인한 값)
 
 
 def verify_pension_code(api: Kiwoom, intraday: list) -> None:
     """ka10065(연기금 확정 코드 6000) 상위 종목의 순매수 수량이 ka10063 결과와 일치하는지 대조."""
     by_code = {r["stk_cd"]: r for r in intraday}
     top = api.intraday_top_pension("001") + api.intraday_top_pension("101")
-    matched = sum(
-        1 for t in top
-        if t["stk_cd"] in by_code and num(by_code[t["stk_cd"]]["netprps_qty"]) == num(t["netslmt"])
-    )
-    print(f"[검증] ka10063 invsr={PENSION_INVSR} vs 연기금 상위(ka10065): {matched}/{len(top)} 종목 순매수 수량 일치")
+    matched = sum(1 for t in top
+                  if t["stk_cd"] in by_code and num(by_code[t["stk_cd"]]["netprps_qty"]) == num(t["netslmt"]))
+    print(f"[검증] 연기금 코드 대조: {matched}/{len(top)} 종목 일치")
     if top and matched < len(top) * 0.5:
-        print("  ⚠ 일치율이 낮습니다. invsr 코드가 연기금이 아닐 수 있으니 결과를 신뢰하지 마세요.")
+        print("  ⚠ 일치율이 낮습니다. 결과를 신뢰하지 마세요.")
+
+
+def git(*cmd) -> subprocess.CompletedProcess:
+    return subprocess.run(["git", *cmd], cwd=ROOT, check=False)
 
 
 def main() -> None:
     ap = argparse.ArgumentParser()
-    ap.add_argument("--min-buy", type=float, default=300, help="오늘 연기금 순매수 하한 (백만원)")
-    ap.add_argument("--lookback", type=int, default=20, help="침묵 판단 기간 (거래일)")
-    ap.add_argument("--quiet-max", type=float, default=30, help="침묵 기간 중 일별 |순매수| 상한 (백만원)")
-    ap.add_argument("--show", type=int, default=15, help="진단 표에 보여줄 후보 수")
-    ap.add_argument("--push", action="store_true", help="시그널 파일을 커밋·푸시해 배포 웹에 반영")
+    ap.add_argument("--push", action="store_true", help="시그널을 커밋·푸시해 웹에 반영")
+    ap.add_argument("--no-pull", action="store_true", help="시작할 때 git pull 생략")
     args = ap.parse_args()
 
     now = datetime.now()
     today = now.strftime("%Y%m%d")
-    api = Kiwoom()
+    if not args.no_pull:
+        git("pull", "--rebase", "--autostash", "-q")
 
-    intraday = api.intraday_investor(PENSION_INVSR)
-    print(f"장중 연기금 잠정 데이터: {len(intraday)} 종목")
-    verify_pension_code(api, intraday)
-
-    candidates = [r for r in intraday
-                  if num(r["netprps_amt"]) >= args.min_buy and not NON_STOCK.search(r["stk_nm"])]
-    candidates.sort(key=lambda r: num(r["netprps_amt"]), reverse=True)
-    print(f"오늘 순매수 >= {args.min_buy:.0f}백만원 후보: {len(candidates)} 종목\n")
-
-    rows, history, unit_check = [], {}, []
-    for r in candidates:
-        daily = api.daily_investor(r["stk_cd"], today)
-        past = [d for d in daily if d["dt"] < today][: args.lookback]
-        history[r["stk_cd"]] = daily
-        today_row = next((d for d in daily if d["dt"] == today), None)
-        if today_row and num(today_row["penfnd_etc"]):
-            unit_check.append(num(today_row["penfnd_etc"]) / num(r["netprps_amt"]))
-        if len(past) < args.lookback:
-            continue  # 상장 직후 등 이력 부족
-        past_flow = [num(d["penfnd_etc"]) for d in past]
-        past_max = max(abs(x) for x in past_flow)
-        today_buy = num(r["netprps_amt"])
-        rows.append({
-            "신호": past_max <= args.quiet_max,
-            "종목코드": r["stk_cd"],
-            "종목명": r["stk_nm"],
-            "등락률": num(r["flu_rt"]),
-            "오늘순매수(억)": round(today_buy / 100, 1),
-            "직전증감(억)": round(num(r["netprps_amt_irds"]) / 100, 1),
-            "과거최대|x|(억)": round(past_max / 100, 2),
-            "과거매매일수": sum(1 for x in past_flow if x != 0),
-            "기준초과일수": sum(1 for x in past_flow if abs(x) > args.quiet_max),
-            "급증배수": round(today_buy / max(past_max, 1), 1),
-        })
-    if unit_check:
-        unit_check.sort()
-        print(f"[검증] 일별(ka10059) 오늘값 / 장중(ka10063) 비율 중앙값: {unit_check[len(unit_check) // 2]:.2f} "
-              f"({len(unit_check)}종목, 장 마감 후 1.0 근처면 단위 일치)")
-    # 조용했던 순서 (과거 최대 절댓값 오름차순)
-    rows.sort(key=lambda x: (x["과거최대|x|(억)"], -x["오늘순매수(억)"]))
-
-    OUT_DIR.mkdir(exist_ok=True)
-    stamp = now.strftime("%Y%m%d_%H%M")
-    (OUT_DIR / f"raw_{stamp}.json").write_text(
-        json.dumps({"intraday": intraday, "history": history}, ensure_ascii=False))
-    if rows:
-        out = OUT_DIR / f"candidates_{stamp}.csv"
-        with out.open("w", newline="", encoding="utf-8-sig") as f:
-            w = csv.DictWriter(f, fieldnames=list(rows[0].keys()))
-            w.writeheader()
-            w.writerows(rows)
-        print(f"후보 전체 -> {out}")
-
-    signals = [x for x in rows if x["신호"]]
-    meta = store.universe_meta()
-    confirmed = {k for k, v in store.load().items() if v.get("source") == "일별 확정"}
-    signals = [x for x in signals if f"{x['종목코드']}_{today}" not in confirmed]  # 확정치는 덮어쓰지 않음
-    store.upsert([{
-        "date": today,
-        "code": x["종목코드"],
-        "name": x["종목명"],
-        "market": meta.get(x["종목코드"], {}).get("market", ""),
-        "buy_eok": x["오늘순매수(억)"],
-        "past_max_eok": x["과거최대|x|(억)"],
-        "active_days": x["과거매매일수"],
-        "lookback": args.lookback,
-        "source": f"장중 {now:%H:%M}",
-    } for x in signals])
-    print(f"\n🔔 신호 {len(signals)} 종목 (과거 {args.lookback}일 매일 |순매수| <= {args.quiet_max / 100:g}억)")
-    print(f"\n가장 조용했던 후보 상위 {args.show} (과거 {args.lookback}일 기준)")
-    cols = [c for c in rows[0].keys() if c != "신호"] if rows else []
-    print("    " + " | ".join(cols))
-    for x in rows[: args.show]:
-        mark = "✅" if x["신호"] else "  "
-        print(f"{mark}  " + " | ".join(str(x[c]) for c in cols))
-
-    if args.push and signals:
-        write_flows([x["종목코드"] for x in signals])
-        git_push(f"장중 시그널 {today} {now:%H:%M} ({len(signals)}건)")
-
-
-def write_flows(codes) -> None:
-    """장중 신호 종목의 차트 데이터를 키움 일별 수급으로 저장 (일배치가 이후 KRX 확정치로 덮어씀)."""
-    from screener.web import pension_flow
-    flow_dir = ROOT / "public" / "data" / "flow"
-    flow_dir.mkdir(parents=True, exist_ok=True)
-    for code in codes:
-        rows = pension_flow(code)
-        (flow_dir / f"{code}.json").write_text(json.dumps({"code": code, "rows": rows}, ensure_ascii=False))
-
-
-def git_push(message: str) -> None:
-    import subprocess
-
-    subprocess.run(["git", "pull", "--rebase", "--autostash", "-q"], cwd=ROOT, check=True)
-    subprocess.run(["git", "add", "public/data"], cwd=ROOT, check=True)
-    if subprocess.run(["git", "diff", "--cached", "--quiet"], cwd=ROOT).returncode == 0:
+    p = load()
+    if str(p.dates[-1]) >= today:
+        print("아카이브에 오늘 확정치가 이미 있습니다. 일배치 결과를 사용하세요.")
         return
-    subprocess.run(["git", "commit", "-q", "-m", message], cwd=ROOT, check=True)
-    subprocess.run(["git", "push", "-q"], cwd=ROOT, check=True)
-    print("시그널 파일 푸시 완료 -> Vercel 자동 배포")
+
+    api = Kiwoom()
+    intraday = api.intraday_investor(PENSION_INVSR)
+    print(f"장중 연기금 잠정 데이터: {len(intraday)} 종목 (아카이브 마지막 거래일 {p.dates[-1]})")
+    verify_pension_code(api, intraday)
+    net_today = {r["stk_cd"]: num(r["netprps_amt"]) * 1e6 for r in intraday}  # 백만원 -> 원
+
+    p2 = S.with_today(p, today, net_today)
+    a = S.attributes(p2)
+    recs = records(p2, a, [len(p2.dates) - 1])
+    for r in recs:
+        r["source"] = f"장중 {now:%H:%M}"
+    n = store.upsert(recs)
+    print(f"기본 포착 {len(recs)}건 저장 ({n}건 갱신)")
+    for name, kw in S.PRESETS.items():
+        hits = [r for r in recs if passes(r, **kw)]
+        print(f"  {name}: {len(hits)}건 " + ", ".join(f"{r['name']} {r['buy_eok']}억" for r in hits[:8]))
+
+    if args.push and recs:
+        codes = {r["code"] for r in recs}
+        write_flows(p2, {k: v for k, v in store.load().items() if v["code"] in codes}, today)
+        git("add", "public/data")
+        if git("diff", "--cached", "--quiet").returncode != 0:
+            git("commit", "-q", "-m", f"장중 시그널 {today} {now:%H:%M} ({len(recs)}건)")
+            git("pull", "--rebase", "--autostash", "-q")
+            if git("push", "-q").returncode == 0:
+                print("푸시 완료 -> 웹 반영")
 
 
 if __name__ == "__main__":

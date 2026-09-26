@@ -1,80 +1,66 @@
 # Smart Money Screener 2
 
-연기금 일별 수급이 0에 가깝다가 장중에 갑자기 급증한 종목을 발굴하는 스크리너.
+연기금 매매가 0에 가깝다가 갑자기 대규모 순매수가 들어온 종목을 찾는 스크리너. 웹: https://smart-money-screener-2.vercel.app
 
-## 설치 (Mac, 키움 API 등록 IP에서 실행)
+## 구조
+
+```
+[일배치] GitHub Actions 평일 16:10, 18:40 KST
+         KRX 확정치 수집 (거래일 하루 4회 호출) → research/archive (2년치 이상 누적)
+         → engine 으로 시그널·필터 속성 계산 → public/data 커밋 → Vercel 자동 배포
+[장중]   회사 Mac: 키움 장중 잠정치(오늘) + 아카이브(어제까지) → 같은 engine → 커밋·푸시
+[웹]     Vercel 정적 페이지. signals.json, filter_stats.json, flow/{코드}.json 만 읽음 (KRX 호출 없음)
+```
+
+DB 는 없습니다. 원천 데이터(`research/archive`)와 웹 데이터(`public/data`)가 모두 Git 에 커밋됩니다.
+
+| 구성 | 파일 | 필요한 설정 |
+|---|---|---|
+| 공통 규칙 | `engine/archive.py`, `engine/signals.py` | - |
+| 일배치 | `batch/daily.py`, `research/collect.py`, `.github/workflows/daily.yml` | GitHub Secrets `KRX_ID`, `KRX_PW` |
+| 웹 | `public/index.html`, `vercel.json` | - |
+| 장중 | `screener/run.py` | Mac `.env` 키움 키, `git push` 가능 |
+| 검증 | `research/evaluate.py`, `research/filter_stats.py` | - |
+
+## 시그널 규칙
+
+- **기본 포착 (넓게)**: 오늘 연기금 순매수 > 0, 1~2일 누적 순매수 1억 이상, 직전 20거래일 중 |순매수| 0.3억 초과인 날 2일 이하. 전날도 0.3억 넘게 샀으면 2일 누적으로 보고 침묵 구간을 하루 앞당긴다.
+- **필터 (웹에서 선택)**: 금액 하한(1/3/5억), 침묵(0.3억 초과일 0/1/2일 이하), 규모 대비(5억 미만이면 거래대금 5% 이상), 2일 연속 매수 포함, 우선주 포함, 시장. 같은 종목은 20거래일 안의 재신호를 뺀다.
+- **프리셋**: 추천(3억·0일·규모 대비), 균형(3억·1일 이하·규모 대비), 넓게(기본 포착 전체).
+- 필터 조합 72개의 과거 2년 성과(`public/data/filter_stats.json`)를 웹에 함께 보여준다.
+
+검증 결과: `research/results/REPORT.md`
+
+## Mac 설치와 장중 스캔
 
 ```bash
 python3 -m venv .venv && source .venv/bin/activate
 pip install -r requirements.txt
 cp .env.example .env && open -e .env   # KIWOOM_APP_KEY / KIWOOM_SECRET_KEY 입력
+
+python -m screener.run          # 장중 스캔 (git pull 후 아카이브 + 키움 잠정치)
+python -m screener.run --push   # 스캔 결과를 커밋·푸시해 웹에 반영
 ```
 
-## 스크리너 실행 (장중)
+로컬 미리보기: `python -m screener.web` (http://localhost:8000).
+
+## 운영 작업
 
 ```bash
-python -m screener.run                                   # 기본값
-python -m screener.run --min-buy 300 --lookback 20 --quiet-max 30
+python -m batch.daily --no-collect --from 20260326     # 아카이브로 기간 재계산 (KRX 호출 없음)
+python -m research.evaluate --split 20250926            # 로직 변형 비교
+python -m research.filter_stats                         # 필터 조합 성과표 갱신
 ```
 
-| 옵션 | 기본값 | 의미 (금액 단위: 백만원) |
+과거 데이터 추가 수집: GitHub → Actions → research-archive → Run workflow (`from`, `to`). 이미 받은 날짜는 다시 부르지 않습니다.
+
+## 사용 API
+
+| 출처 | API | 용도 |
 |---|---|---|
-| `--min-buy` | 300 | 오늘 장중 연기금 순매수 하한 (3억) |
-| `--lookback` | 20 | 침묵 판단 기간 (거래일, 오늘 제외) |
-| `--quiet-max` | 30 | 침묵 기간 중 일별 \|연기금 순매수\| 상한 (0.3억) |
+| KRX 정보데이터시스템 | MDCSTAT02401 투자자별 순매수상위종목 (연기금) | 하루치 전 종목 연기금 매수·매도 |
+| KRX 정보데이터시스템 | MDCSTAT01501 전종목 시세 | 종가·시가·등락률·거래대금·시총 |
+| 키움 REST | ka10063 장중투자자별매매 | 오늘 연기금 잠정 순매수 (장중 스캔) |
+| 키움 REST | ka10065 장중투자자별매매상위 | 연기금 코드 검증 |
 
-결과: `output/signals_YYYYMMDD_HHMM.csv`, 원본 응답 `output/raw_*.json`.
-
-## 운영 구조
-
-```
-[일배치] GitHub Actions 평일 16:10 KST ── KRX 확정치 ──┐  (시그널 + 신호 종목 차트 데이터)
-                                                      ├→ public/data/ 커밋 → Vercel 자동 배포
-[장중]   회사 Mac (키움 잠정치) ──────────────────────┘
-[웹]     Vercel 정적 페이지 (signals.json, flow/{코드}.json 만 읽음, KRX 호출 없음)
-```
-
-DB 는 없습니다. 시그널 목록과 신호 종목 차트 데이터는 모두 Git 에 커밋되는 JSON 파일입니다. KRX 로그인은 일배치 실행당 1회뿐이고, 웹 방문자는 KRX 를 호출하지 않습니다.
-
-| 구성 | 파일 | 필요한 설정 |
-|---|---|---|
-| 일배치 | `batch/daily.py`, `batch/krx.py`, `.github/workflows/daily.yml` | GitHub Secrets `KRX_ID`, `KRX_PW` |
-| 웹 | `public/index.html`, `vercel.json` | - |
-| 장중 | `screener/run.py --push` | Mac `.env` 키움 키, `git push` 가능 |
-
-### 최근 한 달 마이그레이션
-
-GitHub → Actions → daily-pension-signals → Run workflow 에서 `from` / `to` 입력 (예: 20260826 / 20260925).
-Mac 에서 직접: `.env` 에 `KRX_ID`, `KRX_PW` 추가 후 `python -m batch.daily --from 20260826 --to 20260925`.
-
-### 장중 (Mac)
-
-```bash
-python -m screener.run --push   # 스캔 → 시그널 파일 커밋·푸시 → 웹 반영
-```
-
-로컬 미리보기: `python -m screener.web` (http://localhost:8000, 종목 추이는 키움에서 조회).
-
-## 과거 검증 (backscan)
-
-과거 일별 연기금 수급(ka10059, 약 200거래일)으로 기준값별 신호 빈도와 이후 수익률을 계산합니다.
-
-```bash
-python -m screener.backscan --limit 50   # 빠른 테스트
-python -m screener.backscan              # 코스피+코스닥 전체 (첫 실행 20분 이상, 이후 캐시)
-```
-
-결과: `output/backscan_grid_*.csv` (기준값 조합별 신호수·주당 빈도·5/10/20일 수익률), `output/backscan_events_*.csv` (기본값 신호 목록).
-ETF·ETN·스팩은 이름으로 제외하고, 4개 스레드로 초당 5회 이하로 호출합니다.
-수익률은 **같은 날 전체 종목 중앙값 대비 초과수익률(x)**로 봅니다. 시장 국면 효과를 빼기 위해서입니다.
-
-## 사용 API (키움 REST)
-
-| API | 용도 | 단위 |
-|---|---|---|
-| ka10063 장중투자자별매매 | 오늘 연기금 잠정 순매수 (후보 발굴) | 백만원 |
-| ka10059 종목별투자자기관별 | 종목의 과거 일별 연기금(`penfnd_etc`) 수급 100일 | 백만원 |
-| ka10099 종목정보 리스트 | backscan 대상 종목 목록 | - |
-| ka10065 장중투자자별매매상위 | 연기금(6000) 순매수 상위 — ka10063 연기금 코드 검증용 | 주 |
-
-`tools/kiwoom_probe.py` 는 API 응답 구조 탐색용 스크립트입니다.
+`tools/kiwoom_probe.py` 는 키움 API 응답 구조 탐색용, `screener/backscan.py` 는 초기 키움 기반 검증 스크립트입니다.

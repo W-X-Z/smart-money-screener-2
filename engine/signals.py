@@ -56,6 +56,25 @@ def attributes(p: Panel) -> Dict[str, np.ndarray]:
             "adv20": adv20, "adv_pct": adv_pct, "base": base, "pref": pref}
 
 
+def with_today(p: Panel, today: str, net_today: Dict[str, float]) -> Panel:
+    """아카이브(어제까지 확정치)에 오늘 장중 잠정 순매수(원) 한 줄을 붙인 패널. 시세는 전날 값으로 채운다."""
+    ci = {c: i for i, c in enumerate(p.codes)}
+    row = np.zeros(len(p.codes))
+    for code, v in net_today.items():
+        if code in ci:
+            row[ci[code]] = v
+
+    def carry(x):
+        return np.vstack([x, x[-1:]])
+
+    return Panel(
+        dates=np.append(p.dates, today), codes=p.codes, names=p.names, market=p.market,
+        net=np.vstack([p.net, row]), gross=np.vstack([p.gross, np.abs(row)]),
+        close=carry(p.close), open=carry(p.open), fluc=np.vstack([p.fluc, np.zeros((1, len(p.codes)))]),
+        trdval=carry(p.trdval), mcap=carry(p.mcap),
+    )
+
+
 def mask(a: Dict[str, np.ndarray], amount=3, silence=0, scale=True, two_day=True, pref=True) -> np.ndarray:
     """기본 포착 위에 필터를 적용. pref=False 면 우선주 제외."""
     m = a["base"] & (a["amount"] >= amount * EOK) & (a["big_days"] <= silence)
