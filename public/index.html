@@ -56,9 +56,31 @@ header { display: flex; align-items: baseline; justify-content: space-between; g
 h1 { font-size: 22px; font-weight: 700; letter-spacing: -0.02em; margin: 0; }
 .meta { color: var(--text-3); font-size: 13px; white-space: nowrap; }
 
-.controls { display: flex; gap: 8px; margin-bottom: 20px; }
+.toolbar { display: flex; gap: 8px; margin-bottom: 10px; align-items: center; }
 .seg { display: inline-flex; background: var(--control); border-radius: 10px; padding: 3px; flex: none; }
-.seg button { border: 0; background: none; padding: 6px 12px; border-radius: 8px; font-size: 14px; color: var(--text-2); cursor: pointer; }
+.seg button { border: 0; background: none; padding: 6px 12px; border-radius: 8px; font-size: 14px; color: var(--text-2); cursor: pointer; white-space: nowrap; }
+.seg.sm button { padding: 5px 10px; font-size: 13px; }
+.fbtn { display: inline-flex; align-items: center; gap: 6px; height: 36px; padding: 0 12px; border: 1px solid var(--border); border-radius: 10px; background: var(--surface); cursor: pointer; font-size: 14px; color: var(--text-2); flex: none; }
+.fbtn svg { width: 16px; height: 16px; stroke: currentColor; }
+.fbtn .dot { width: 6px; height: 6px; border-radius: 50%; background: var(--buy); display: none; }
+.fbtn.custom .dot { display: inline-block; }
+.fbtn[aria-expanded="true"] { color: var(--text); border-color: var(--text-3); }
+.fcard { display: none; background: var(--surface); border: 1px solid var(--border); border-radius: 14px; padding: 4px 16px; margin-bottom: 12px; }
+.fcard.open { display: block; }
+.frow { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 10px 0; }
+.frow + .frow { border-top: 1px solid var(--border); }
+.frow .lbl { font-size: 14px; color: var(--text); }
+.frow .lbl small { display: block; font-size: 12px; color: var(--text-3); margin-top: 1px; }
+.switch { appearance: none; -webkit-appearance: none; width: 40px; height: 24px; margin: 0; border-radius: 999px; background: var(--control); position: relative; cursor: pointer; flex: none; transition: background .15s; }
+.switch::after { content: ""; position: absolute; top: 3px; left: 3px; width: 18px; height: 18px; border-radius: 50%; background: #fff; box-shadow: 0 1px 2px rgba(0,0,0,.25); transition: transform .15s; }
+.switch:checked { background: var(--focus); }
+.switch:checked::after { transform: translateX(16px); }
+.switch:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+.stats { display: flex; flex-wrap: wrap; gap: 4px 14px; font-size: 13px; color: var(--text-3); margin: 0 2px 16px; font-variant-numeric: tabular-nums; }
+.stats b { color: var(--text-2); font-weight: 600; }
+.pill.mute { color: var(--text-3); }
+.v.up { color: var(--buy); }
+.v.down { color: var(--sell); }
 .seg button[aria-pressed="true"] { background: var(--surface); color: var(--text); font-weight: 600; box-shadow: 0 1px 2px rgba(0,0,0,.08); }
 .search { flex: 1; min-width: 0; position: relative; }
 .search input {
@@ -102,7 +124,8 @@ h1 { font-size: 22px; font-weight: 700; letter-spacing: -0.02em; margin: 0; }
 .x { border: 0; background: var(--surface-2); width: 32px; height: 32px; border-radius: 50%; cursor: pointer; display: grid; place-items: center; flex: none; }
 .x svg { width: 14px; height: 14px; stroke: var(--text-2); }
 .panel-b { padding: 12px 22px 28px; overflow-y: auto; }
-.kpis { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin: 8px 0 22px; }
+.kpis { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; margin: 8px 0 22px; }
+.kpi .s { font-size: 12px; color: var(--text-3); margin-top: 1px; }
 .kpi { background: var(--surface-2); border-radius: 12px; padding: 12px; }
 .kpi .k { font-size: 12px; color: var(--text-3); }
 .kpi .v { font-size: 18px; font-weight: 700; font-variant-numeric: tabular-nums; margin-top: 2px; }
@@ -127,8 +150,9 @@ svg.c text { fill: var(--text-3); font-size: 11px; font-family: inherit; }
 
 @media (max-width: 600px) {
   .wrap { padding: 20px 16px 48px; }
-  .controls { flex-wrap: wrap; }
-  .search { flex-basis: 100%; }
+  .toolbar { flex-wrap: wrap; }
+  .search { flex-basis: 100%; order: 3; }
+  .frow { flex-wrap: wrap; }
   .panel { top: auto; width: 100%; height: 88vh; border-radius: 18px 18px 0 0; transform: translateY(100%); }
   .panel.open { transform: none; }
   .panel-h { padding: 18px 16px 4px; }
@@ -144,17 +168,34 @@ svg.c text { fill: var(--text-3); font-size: 11px; font-family: inherit; }
     <span class="meta" id="meta"></span>
   </header>
 
-  <div class="controls">
-    <div class="seg" role="group" aria-label="시장">
-      <button aria-pressed="true" data-m="">전체</button>
-      <button aria-pressed="false" data-m="코스피">코스피</button>
-      <button aria-pressed="false" data-m="코스닥">코스닥</button>
+  <div class="toolbar">
+    <div class="seg" id="presets" role="group" aria-label="프리셋">
+      <button data-p="추천" aria-pressed="true">추천</button>
+      <button data-p="균형" aria-pressed="false">균형</button>
+      <button data-p="넓게" aria-pressed="false">넓게</button>
     </div>
+    <button class="fbtn" id="fbtn" aria-expanded="false" aria-controls="fcard">
+      <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round"><path d="M4 7h10M18 7h2M4 17h4M12 17h8"/><circle cx="16" cy="7" r="2"/><circle cx="10" cy="17" r="2"/></svg>필터<span class="dot"></span>
+    </button>
     <label class="search">
       <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
       <input id="q" type="search" placeholder="종목 검색" aria-label="종목 검색">
     </label>
   </div>
+
+  <div class="fcard" id="fcard">
+    <div class="frow"><div class="lbl">연기금 순매수<small>1~2일 누적</small></div>
+      <div class="seg sm" data-f="amount" role="group" aria-label="연기금 순매수 하한"><button data-v="1">1억+</button><button data-v="3">3억+</button><button data-v="5">5억+</button></div></div>
+    <div class="frow"><div class="lbl">침묵<small>직전 20일 중 0.3억 넘게 매매한 날</small></div>
+      <div class="seg sm" data-f="silence" role="group" aria-label="침묵 강도"><button data-v="0">0일</button><button data-v="1">1일 이하</button><button data-v="2">2일 이하</button></div></div>
+    <div class="frow"><div class="lbl">규모 대비<small>5억 미만이면 거래대금의 5% 이상</small></div><input type="checkbox" class="switch" data-f="scale" aria-label="규모 대비"></div>
+    <div class="frow"><div class="lbl">2일 연속 매수 포함</div><input type="checkbox" class="switch" data-f="two_day" aria-label="2일 연속 매수 포함"></div>
+    <div class="frow"><div class="lbl">우선주 포함</div><input type="checkbox" class="switch" data-f="pref" aria-label="우선주 포함"></div>
+    <div class="frow"><div class="lbl">시장</div>
+      <div class="seg sm" data-f="market" role="group" aria-label="시장"><button data-v="">전체</button><button data-v="코스피">코스피</button><button data-v="코스닥">코스닥</button></div></div>
+  </div>
+
+  <div class="stats" id="stats"></div>
 
   <main id="list"><div class="empty">불러오는 중</div></main>
 </div>
@@ -178,35 +219,97 @@ const fmtWon = (v) => `${Math.round(v).toLocaleString("ko-KR")}원`;
 const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
 const CHEV = `<svg class="chev" viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round"><path d="m9 6 6 6-6 6"/></svg>`;
 
-let SIGNALS = [], MARKET = "", CURRENT = null;
+const PRESETS = {
+  추천: { amount: 3, silence: 0, scale: true, two_day: true, pref: true },
+  균형: { amount: 3, silence: 1, scale: true, two_day: true, pref: true },
+  넓게: { amount: 1, silence: 2, scale: false, two_day: true, pref: true },
+};
+const COOLDOWN = 20; // 같은 종목 재신호 억제 (거래일), engine/signals.py 와 동일
+let SIGNALS = [], STATS = null, CURRENT = null, UPDATED = "";
+let F = { ...PRESETS["추천"], market: "" };
+try { const saved = JSON.parse(localStorage.getItem("pension-filter") || "null"); if (saved) F = { ...F, ...saved }; } catch (e) {}
 
 async function load() {
-  const res = await fetch("/data/signals.json", { cache: "no-cache" });
+  const [res, st] = await Promise.all([
+    fetch("/data/signals.json", { cache: "no-cache" }),
+    fetch("/data/filter_stats.json", { cache: "no-cache" }).catch(() => null),
+  ]);
   SIGNALS = res.ok ? await res.json() : [];
+  STATS = st && st.ok ? await st.json() : null;
   const last = res.headers.get("last-modified");
   const upd = last ? new Date(last) : null;
-  $("#meta").textContent = `${SIGNALS.length}건` + (upd ? ` · ${upd.getMonth() + 1}/${upd.getDate()} ${String(upd.getHours()).padStart(2, "0")}:${String(upd.getMinutes()).padStart(2, "0")}` : "");
-  render();
+  UPDATED = upd ? ` · ${upd.getMonth() + 1}/${upd.getDate()} ${String(upd.getHours()).padStart(2, "0")}:${String(upd.getMinutes()).padStart(2, "0")}` : "";
+  syncControls(); render();
+}
+
+const presetOf = () => Object.keys(PRESETS).find((k) => ["amount", "silence", "scale", "two_day", "pref"].every((f) => PRESETS[k][f] === F[f]));
+// engine/signals.py mask() 와 같은 규칙
+const passes = (s) => s.buy_eok >= F.amount && (s.big_days ?? 0) <= F.silence
+  && (!F.scale || s.buy_eok >= 5 || (s.adv_pct ?? 0) >= 5)
+  && (F.two_day || !s.two_day) && (F.pref || !s.pref) && (!F.market || s.market === F.market);
+
+function filtered() {
+  const asc = SIGNALS.filter(passes).sort((a, b) => a.date.localeCompare(b.date));
+  const last = {}, out = [];
+  for (const s of asc) {
+    const t = s.tix ?? 0;
+    if (last[s.code] == null || t - last[s.code] >= COOLDOWN) { out.push(s); last[s.code] = t; }
+  }
+  return out.reverse();
+}
+
+function syncControls() {
+  const p = presetOf();
+  document.querySelectorAll("#presets button").forEach((b) => b.setAttribute("aria-pressed", b.dataset.p === p));
+  $("#fbtn").classList.toggle("custom", !p || !!F.market);
+  document.querySelectorAll(".fcard .seg").forEach((g) => g.querySelectorAll("button").forEach((b) =>
+    b.setAttribute("aria-pressed", String(F[g.dataset.f]) === b.dataset.v)));
+  document.querySelectorAll(".fcard .switch").forEach((c) => { c.checked = !!F[c.dataset.f]; });
+  try { localStorage.setItem("pension-filter", JSON.stringify(F)); } catch (e) {}
+}
+
+function renderStats() {
+  const key = `a${F.amount}_s${F.silence}_r${+F.scale}_d${+F.two_day}_p${+F.pref}`;
+  const s = STATS && STATS.stats[key];
+  if (!s || !s.x20) { $("#stats").innerHTML = ""; return; }
+  const pct = (v) => `${v > 0 ? "+" : ""}${v.toFixed(1)}%`;
+  const base = STATS.baseline && STATS.baseline.x20 ? STATS.baseline.x20.mean : null;
+  $("#stats").innerHTML = `<span>과거 2년</span><span>주 <b>${s.per_week}건</b></span>`
+    + `<span>20일 초과수익 중앙 <b>${pct(s.x20.median)}</b></span>`
+    + `<span>평균 <b>${pct(s.x20.mean)}</b>${base != null ? ` (무작위 ${pct(base)})` : ""}</span>`
+    + `<span>승률 <b>${s.x20.win}%</b></span>`;
 }
 
 function render() {
+  renderStats();
   const q = $("#q").value.trim().toLowerCase();
-  const list = SIGNALS.filter((s) => (!MARKET || s.market === MARKET) && (!q || s.name.toLowerCase().includes(q) || s.code.includes(q)));
+  const list = filtered().filter((s) => !q || s.name.toLowerCase().includes(q) || s.code.includes(q));
+  $("#meta").textContent = `${list.length}건${UPDATED}`;
   if (!list.length) { $("#list").innerHTML = `<div class="empty">${SIGNALS.length ? "결과 없음" : "시그널 없음"}</div>`; return; }
   $("#list").innerHTML = `<div class="list">${list.map((s) => `
     <button class="item" data-key="${esc(s.code)}_${esc(s.date)}">
       <div class="dd"><b>${fmtMd(s.date)}</b><span>${WD[toDate(s.date).getDay()]}</span></div>
       <div class="nm">
-        <div class="name">${esc(s.name)}${s.source.startsWith("장중") || s.intraday ? `<span class="pill">장중</span>` : ""}</div>
+        <div class="name">${esc(s.name)}${s.source.startsWith("장중") || s.intraday ? `<span class="pill">장중</span>` : ""}${s.two_day ? `<span class="pill mute">2일</span>` : ""}</div>
         <div class="sub">${esc(s.code)}${s.market ? ` · ${esc(s.market)}` : ""}</div>
       </div>
       <div class="amt">${fmtEok(s.buy_eok)}</div>${CHEV}
     </button>`).join("")}</div>`;
 }
 
-document.querySelectorAll(".seg button").forEach((b) => b.addEventListener("click", () => {
-  document.querySelectorAll(".seg button").forEach((x) => x.setAttribute("aria-pressed", x === b));
-  MARKET = b.dataset.m; render();
+document.querySelectorAll("#presets button").forEach((b) => b.addEventListener("click", () => {
+  F = { ...F, ...PRESETS[b.dataset.p] }; syncControls(); render();
+}));
+$("#fbtn").addEventListener("click", () => {
+  const open = $("#fcard").classList.toggle("open");
+  $("#fbtn").setAttribute("aria-expanded", open);
+});
+document.querySelectorAll(".fcard .seg").forEach((g) => g.addEventListener("click", (e) => {
+  const b = e.target.closest("button"); if (!b) return;
+  F[g.dataset.f] = g.dataset.f === "market" ? b.dataset.v : +b.dataset.v; syncControls(); render();
+}));
+document.querySelectorAll(".fcard .switch").forEach((c) => c.addEventListener("change", () => {
+  F[c.dataset.f] = c.checked; syncControls(); render();
 }));
 $("#q").addEventListener("input", render);
 $("#list").addEventListener("click", (e) => { const b = e.target.closest(".item"); if (b) open(b.dataset.key, b); });
@@ -227,12 +330,14 @@ async function open(key, from) {
   lastFocus = from;
   const s = SIGNALS.find((x) => `${x.code}_${x.date}` === key);
   $("#p-name").textContent = s.name;
-  $("#p-sub").textContent = `${s.code}${s.market ? " · " + s.market : ""}`;
+  $("#p-sub").textContent = `${s.code}${s.market ? " · " + s.market : ""} · 신호일 ${+s.date.slice(4, 6)}월 ${+s.date.slice(6, 8)}일`;
+  const ret = s.ret_pct;
   $("#p-body").innerHTML = `
     <div class="kpis">
-      <div class="kpi"><div class="k">연기금 순매수</div><div class="v buy">${fmtEok(s.buy_eok)}</div></div>
-      <div class="kpi"><div class="k">직전 ${s.lookback}일 최대</div><div class="v">${fmtEok(s.past_max_eok, false)}</div></div>
-      <div class="kpi"><div class="k">신호일</div><div class="v">${fmtMd(s.date)}</div></div>
+      <div class="kpi"><div class="k">연기금 순매수${s.two_day ? " (2일)" : ""}</div><div class="v buy">${fmtEok(s.buy_eok)}</div></div>
+      <div class="kpi"><div class="k">거래대금 대비</div><div class="v">${s.adv_pct != null ? s.adv_pct.toFixed(1) + "%" : "-"}</div><div class="s">20일 평균 거래대금 기준</div></div>
+      <div class="kpi"><div class="k">직전 ${s.lookback || 20}일 최대</div><div class="v">${fmtEok(s.past_max_eok, false)}</div><div class="s">0.3억 초과 ${s.big_days ?? 0}일</div></div>
+      <div class="kpi"><div class="k">신호 후 수익률</div><div class="v ${ret > 0 ? "up" : ret < 0 ? "down" : ""}">${ret != null ? `${ret > 0 ? "+" : ""}${ret.toFixed(1)}%` : "-"}</div><div class="s">${ret != null ? `다음날 시가 매수, ${s.ret_days}거래일` : "다음 거래일부터 계산"}</div></div>
     </div>
     <div class="state" id="p-state">불러오는 중</div>`;
   $("#panel").classList.add("open"); $("#scrim").classList.add("open");
@@ -241,7 +346,7 @@ async function open(key, from) {
     const res = await fetch(`/data/flow/${encodeURIComponent(s.code)}.json`, { cache: "no-cache" });
     if (!res.ok) throw new Error("차트 데이터 없음");
     const rows = (await res.json()).rows.filter((r) => r.close > 0);
-    const signalDates = new Set(SIGNALS.filter((x) => x.code === s.code).map((x) => x.date));
+    const signalDates = new Set([s.date, ...filtered().filter((x) => x.code === s.code).map((x) => x.date)]);
     CURRENT = { rows, signalDates };
     $("#p-state").outerHTML = `
       <div class="ct">연기금 순매수 <span class="lg"><span><i style="background:var(--buy)"></i>매수</span><span><i style="background:var(--sell)"></i>매도</span><span>▼ 신호</span></span></div>

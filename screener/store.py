@@ -1,15 +1,21 @@
-"""시그널 저장소 (public/data/signals.json). 일배치·장중 스크리너가 같은 파일에 쌓고 Git 으로 배포한다."""
+"""시그널 저장소 (public/data/signals.json + signals.csv). 일배치·장중 스크리너가 같은 파일에 쌓고 Git 으로 배포한다."""
 
+import csv
 import json
 from datetime import datetime, timedelta, timezone
+from pathlib import Path
 from typing import Dict, List
 
-from screener.kiwoom import ROOT
-
+ROOT = Path(__file__).resolve().parent.parent
 OUTPUT_DIR = ROOT / "output"
 CACHE_DIR = OUTPUT_DIR / "cache"
 # 웹에서 그대로 서빙되는 시그널 목록 (Git 에 커밋 -> Vercel 배포)
 SIGNALS_PATH = ROOT / "public" / "data" / "signals.json"
+CONFIRMED = "일별 확정"
+
+
+def now_kst() -> str:
+    return datetime.now(timezone(timedelta(hours=9))).strftime("%Y-%m-%d %H:%M")
 
 
 def load() -> Dict[str, dict]:
@@ -18,34 +24,74 @@ def load() -> Dict[str, dict]:
     return {}
 
 
-def upsert(signals: List[dict]) -> int:
-    """종목코드+신호일 기준으로 추가/갱신. 추가·갱신된 건수를 반환."""
-    data = load()
-    now = datetime.now(timezone(timedelta(hours=9))).strftime("%Y-%m-%d %H:%M")
-    for s in signals:
-        key = f"{s['code']}_{s['date']}"
-        data[key] = {**data.get(key, {}), **s, "updated_at": now}
+def save(data: Dict[str, dict]) -> None:
     SIGNALS_PATH.parent.mkdir(parents=True, exist_ok=True)
     rows = sorted(data.values(), key=lambda s: (s["date"], s["buy_eok"]), reverse=True)
     SIGNALS_PATH.write_text("[\n" + ",\n".join(json.dumps(r, ensure_ascii=False) for r in rows) + "\n]\n")
     write_csv(rows)
-    return len(signals)
+
+
+def upsert(signals: List[dict]) -> int:
+    """종목코드+신호일 기준으로 추가/갱신 (장중 스캔용). 일별 확정 신호는 장중 값으로 덮어쓰지 않는다."""
+    data = load()
+    now = now_kst()
+    n = 0
+    for s in signals:
+        key = f"{s['code']}_{s['date']}"
+        if data.get(key, {}).get("source") == CONFIRMED:
+            continue
+        data[key] = {**data.get(key, {}), **s, "updated_at": now}
+        n += 1
+    save(data)
+    return n
+
+
+def replace_confirmed(start: str, end: str, signals: List[dict]) -> None:
+    """start~end 의 일별 확정 신호를 새 계산 결과로 교체. 장중에 먼저 잡힌 신호는 표시를 남긴다."""
+    data = load()
+    now = now_kst()
+    keys = {f"{s['code']}_{s['date']}" for s in signals}
+    for k, v in list(data.items()):
+        if start <= v["date"] <= end and v.get("source") == CONFIRMED and k not in keys:
+            del data[k]
+    for s in signals:
+        key = f"{s['code']}_{s['date']}"
+        prev = data.get(key, {})
+        if prev.get("source", "").startswith("장중"):
+            s = {**s, "intraday": prev["source"]}
+        data[key] = {**prev, **s, "updated_at": now}
+    save(data)
+
+
+CSV_COLS = [
+    ("신호일", "date"), ("종목코드", "code"), ("종목명", "name"), ("시장", "market"),
+    ("연기금 순매수(억, 1~2일)", "buy_eok"), ("거래대금 대비(%)", "adv_pct"), ("직전 20일 최대(억)", "past_max_eok"),
+    ("0.3억 초과일", "big_days"), ("2일 누적", "two_day"), ("우선주", "pref"),
+    ("신호 후 수익률(%)", "ret_pct"), ("경과 거래일", "ret_days"),
+    ("구분", "source"), ("장중 선행", "intraday"), ("갱신", "updated_at"),
+]
 
 
 def write_csv(rows: List[dict]) -> None:
     """Google Sheets 가 IMPORTDATA 로 읽는 운영 시그널 기록 (public/data/signals.csv)."""
-    import csv
-    cols = [("신호일", "date"), ("종목코드", "code"), ("종목명", "name"), ("시장", "market"),
-            ("연기금 순매수(억)", "buy_eok"), ("직전 최대(억)", "past_max_eok"), ("구분", "source"),
-            ("장중 선행", "intraday"), ("갱신", "updated_at")]
     with (SIGNALS_PATH.parent / "signals.csv").open("w", newline="", encoding="utf-8") as f:
         w = csv.writer(f)
-        w.writerow([c for c, _ in cols])
+        w.writerow([c for c, _ in CSV_COLS])
         for r in rows:
             d = str(r.get("date", ""))
-            vals = [r.get(k, "") for _, k in cols[1:]]
-            vals[0] = f"A{vals[0]}"  # IMPORTDATA 가 앞자리 0 을 지우지 않게
-            w.writerow([f"{d[:4]}-{d[4:6]}-{d[6:]}"] + vals)
+            vals = []
+            for _, k in CSV_COLS:
+                v = r.get(k, "")
+                if k == "date":
+                    v = f"{d[:4]}-{d[4:6]}-{d[6:]}"
+                elif k == "code":
+                    v = f"A{v}"  # IMPORTDATA 가 앞자리 0 을 지우지 않게
+                elif isinstance(v, bool):
+                    v = "Y" if v else ""
+                elif v is None:
+                    v = ""
+                vals.append(v)
+            w.writerow(vals)
 
 
 def universe_meta() -> Dict[str, dict]:

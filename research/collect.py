@@ -7,9 +7,12 @@
 휴장일은 첫 호출이 비면 나머지를 부르지 않고, 이미 저장한 날짜는 다시 부르지 않는다.
 
 저장 (Git 에 커밋):
-  research/archive/pension/YYYYMM.parquet  date, code, buy, sell (원)
-  research/archive/prices/YYYYMM.parquet   date, code, name, market, open, close, fluc_rt, trdval, mktcap
-  research/archive/calendar.json           조회를 마친 날짜 -> "open" | "holiday"
+  research/archive/{pension,prices}/YYYYMM.parquet        과거 일괄 수집분 (월별)
+  research/archive/{pension,prices}/daily/YYYYMMDD.parquet 일배치 수집분 (날짜별, 매일 새 파일만 추가)
+    pension: date, code, buy, sell (원)
+    prices:  date, code, name, market, open, close, fluc_rt, trdval, mktcap
+  research/archive/calendar.json  조회를 마친 날짜 -> "open" | "holiday"
+오늘 날짜는 값이 바뀔 수 있어 매번 다시 받고, 비어 있어도 휴장으로 기록하지 않는다 (공개 전일 수 있음).
 
 사용법 (KRX_ID / KRX_PW 필요):
     python -m research.collect --from 20250926 --to 20260925 --max-minutes 50
@@ -20,7 +23,7 @@ import json
 import sys
 import time
 from collections import defaultdict
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 import pandas as pd
@@ -79,13 +82,13 @@ def price_rows(krx: KRX, day: str) -> list:
     return rows
 
 
-def flush(kind: str, rows: list) -> None:
-    """월별 parquet 에 병합 저장."""
-    by_month = defaultdict(list)
+def flush(kind: str, rows: list, daily: bool = False) -> None:
+    """월별 parquet 에 병합 저장. daily=True 면 날짜별 파일로 저장 (Git 에 매일 작은 새 파일만 추가)."""
+    groups = defaultdict(list)
     for r in rows:
-        by_month[r["date"][:6]].append(r)
-    for month, new in by_month.items():
-        path = ARCHIVE / kind / f"{month}.parquet"
+        groups[r["date"] if daily else r["date"][:6]].append(r)
+    for part, new in groups.items():
+        path = ARCHIVE / kind / ("daily" if daily else "") / f"{part}.parquet"
         path.parent.mkdir(parents=True, exist_ok=True)
         df = pd.DataFrame(new)
         if path.exists():
@@ -94,56 +97,65 @@ def flush(kind: str, rows: list) -> None:
         df.to_parquet(path, index=False, compression="zstd")
 
 
-def main() -> None:
-    ap = argparse.ArgumentParser()
-    ap.add_argument("--from", dest="start", required=True)
-    ap.add_argument("--to", dest="end", required=True)
-    ap.add_argument("--max-minutes", type=float, default=50, help="이 시간을 넘기면 저장 후 종료 (다음 실행이 이어서 수집)")
-    args = ap.parse_args()
-
+def collect(start: str, end: str, max_minutes: float = 50, daily: bool = False, krx: KRX = None) -> int:
+    """start~end 거래일 수집. 이미 받은 날짜는 건너뛰고, 오늘(KST)은 항상 다시 받는다. 받은 거래일 수를 반환."""
+    today = datetime.now(timezone(timedelta(hours=9))).strftime("%Y%m%d")
     calendar = json.loads(CALENDAR.read_text()) if CALENDAR.exists() else {}
-    todo, d = [], datetime.strptime(args.end, "%Y%m%d")
-    while d >= datetime.strptime(args.start, "%Y%m%d"):
+    todo, d = [], datetime.strptime(end, "%Y%m%d")
+    while d >= datetime.strptime(start, "%Y%m%d"):
         day = d.strftime("%Y%m%d")
-        if d.weekday() < 5 and day not in calendar:
+        if d.weekday() < 5 and (day not in calendar or day == today):
             todo.append(day)
         d -= timedelta(days=1)
     print(f"수집 대상 {len(todo)}일 (이미 저장된 날짜·주말 제외)")
+    if not todo:
+        return 0
 
-    krx = KRX()
-    started, pension, prices, calls = time.time(), [], [], 0
-    stopped_early = False
+    krx = krx or KRX()
+    started, pension, prices, calls, got = time.time(), [], [], 0, 0
     try:
         for i, day in enumerate(todo, 1):
-            if (time.time() - started) / 60 > args.max_minutes:
-                stopped_early = True
+            if (time.time() - started) / 60 > max_minutes:
                 print(f"시간 제한 도달: {i - 1}/{len(todo)}일 수집 후 중단 (다시 실행하면 이어서 수집)")
                 break
             p = pension_rows(krx, day)
             calls += 1 if not p else 2
             if not p:
-                calendar[day] = "holiday"
+                if day != today:
+                    calendar[day] = "holiday"
+                else:
+                    print(f"  {day}: 오늘 데이터 없음 (휴장이거나 아직 공개 전)")
                 continue
             q = price_rows(krx, day)
             calls += 2
             pension += p
             prices += q
             calendar[day] = "open"
+            got += 1
             if len(prices) >= 20 * 2700:  # 약 20거래일마다 중간 저장
-                flush("pension", pension)
-                flush("prices", prices)
+                flush("pension", pension, daily)
+                flush("prices", prices, daily)
                 pension, prices = [], []
                 CALENDAR.write_text(json.dumps(calendar, sort_keys=True, indent=0))
             print(f"  {day}: 연기금 {len(p)}종목, 시세 {len(q)}종목  ({i}/{len(todo)}, 호출 {calls})")
     finally:
-        flush("pension", pension)
-        flush("prices", prices)
+        flush("pension", pension, daily)
+        flush("prices", prices, daily)
         ARCHIVE.mkdir(parents=True, exist_ok=True)
         CALENDAR.write_text(json.dumps(calendar, sort_keys=True, indent=0))
         opened = sum(1 for v in calendar.values() if v == "open")
-        print(f"완료: KRX 호출 {calls}회, {(time.time() - started) / 60:.1f}분, 누적 거래일 {opened}일")
-    if stopped_early:
-        sys.exit(0)
+        print(f"수집 완료: KRX 호출 {calls}회, {(time.time() - started) / 60:.1f}분, 누적 거래일 {opened}일")
+    return got
+
+
+def main() -> None:
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--from", dest="start", required=True)
+    ap.add_argument("--to", dest="end", required=True)
+    ap.add_argument("--max-minutes", type=float, default=50, help="이 시간을 넘기면 저장 후 종료 (다음 실행이 이어서 수집)")
+    ap.add_argument("--daily", action="store_true", help="날짜별 파일로 저장 (일배치용)")
+    args = ap.parse_args()
+    collect(args.start, args.end, args.max_minutes, args.daily)
 
 
 if __name__ == "__main__":
