@@ -1,1 +1,7 @@
-[]
+[
+{"date": "20260917", "code": "000155", "name": "두산우", "market": "코스피", "buy_eok": 3.64, "past_max_eok": 0.27, "active_days": 4, "lookback": 20, "source": "일별 확정", "updated_at": "2026-09-26 18:18"},
+{"date": "20260911", "code": "204270", "name": "제이앤티씨", "market": "코스닥", "buy_eok": 4.71, "past_max_eok": 0.0, "active_days": 0, "lookback": 20, "source": "일별 확정", "updated_at": "2026-09-26 18:18"},
+{"date": "20260902", "code": "092870", "name": "엑시콘", "market": "코스닥", "buy_eok": 18.9, "past_max_eok": 0.02, "active_days": 12, "lookback": 20, "source": "일별 확정", "updated_at": "2026-09-26 18:18"},
+{"date": "20260831", "code": "183190", "name": "아세아시멘트", "market": "코스피", "buy_eok": 5.9, "past_max_eok": 0.18, "active_days": 2, "lookback": 20, "source": "일별 확정", "updated_at": "2026-09-26 18:18"},
+{"date": "20260828", "code": "294570", "name": "쿠콘", "market": "코스닥", "buy_eok": 14.76, "past_max_eok": 0.0, "active_days": 0, "lookback": 20, "source": "일별 확정", "updated_at": "2026-09-26 18:18"}
+]
