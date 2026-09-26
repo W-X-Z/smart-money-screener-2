@@ -1,7 +1,7 @@
 """KRX 정보데이터시스템(data.krx.co.kr) 최소 클라이언트. requests 만 사용.
 
 pykrx 와 같은 방식으로 로그인(KRX_ID / KRX_PW)한 세션으로 getJsonData 를 호출한다.
-일배치(batch/daily.py)와 Vercel 함수(api/flow.py)가 함께 쓴다.
+일배치(batch/daily.py)가 쓴다. 로그인은 배치 실행당 1회.
 """
 
 import os

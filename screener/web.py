@@ -13,7 +13,7 @@ import time
 import webbrowser
 from datetime import date
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
-from urllib.parse import parse_qs, urlparse
+from urllib.parse import urlparse
 
 from screener import store
 from screener.kiwoom import ROOT, Kiwoom, num
@@ -58,11 +58,15 @@ class Handler(BaseHTTPRequestHandler):
             elif url.path == "/data/signals.json":
                 body = store.SIGNALS_PATH.read_bytes() if store.SIGNALS_PATH.exists() else b"[]"
                 self._send(200, body, "application/json; charset=utf-8")
-            elif url.path == "/api/flow":
-                code = parse_qs(url.query).get("code", [""])[0]
+            elif url.path.startswith("/data/flow/") and url.path.endswith(".json"):
+                code = url.path[len("/data/flow/"):-len(".json")]
                 if not CODE.match(code):
                     return self._json(400, {"error": "잘못된 종목코드"})
-                self._json(200, {"code": code, "rows": pension_flow(code)})
+                path = PUBLIC_DIR / "data" / "flow" / f"{code}.json"
+                if path.exists():
+                    self._send(200, path.read_bytes(), "application/json; charset=utf-8")
+                else:  # 로컬에서는 파일이 없으면 키움으로 바로 조회
+                    self._json(200, {"code": code, "rows": pension_flow(code)})
             else:
                 self._json(404, {"error": "not found"})
         except Exception as e:  # 화면에 오류를 보여주기 위해 JSON 으로 반환

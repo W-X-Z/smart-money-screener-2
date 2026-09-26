@@ -28,19 +28,18 @@ python -m screener.run --min-buy 300 --lookback 20 --quiet-max 30
 ## 운영 구조
 
 ```
-[일배치] GitHub Actions 평일 16:10 KST ── KRX 확정치 ──┐
-                                                      ├→ public/data/signals.json 커밋 → Vercel 자동 배포
+[일배치] GitHub Actions 평일 16:10 KST ── KRX 확정치 ──┐  (시그널 + 신호 종목 차트 데이터)
+                                                      ├→ public/data/ 커밋 → Vercel 자동 배포
 [장중]   회사 Mac (키움 잠정치) ──────────────────────┘
-[웹]     Vercel 정적 페이지 → 종목 클릭 → /api/flow (Vercel 함수, 서울 리전) → KRX
+[웹]     Vercel 정적 페이지 (signals.json, flow/{코드}.json 만 읽음, KRX 호출 없음)
 ```
 
-DB 는 없습니다. 시그널 목록은 Git 에 커밋되는 JSON 파일 하나이고, 종목별 연기금 추이는 클릭할 때 조회합니다.
+DB 는 없습니다. 시그널 목록과 신호 종목 차트 데이터는 모두 Git 에 커밋되는 JSON 파일입니다. KRX 로그인은 일배치 실행당 1회뿐이고, 웹 방문자는 KRX 를 호출하지 않습니다.
 
 | 구성 | 파일 | 필요한 설정 |
 |---|---|---|
-| 일배치 | `batch/daily.py`, `.github/workflows/daily.yml` | GitHub Secrets `KRX_ID`, `KRX_PW` |
+| 일배치 | `batch/daily.py`, `batch/krx.py`, `.github/workflows/daily.yml` | GitHub Secrets `KRX_ID`, `KRX_PW` |
 | 웹 | `public/index.html`, `vercel.json` | - |
-| 클릭 조회 | `api/flow.py`, `api/_krx.py` | Vercel 환경변수 `KRX_ID`, `KRX_PW` |
 | 장중 | `screener/run.py --push` | Mac `.env` 키움 키, `git push` 가능 |
 
 ### 최근 한 달 마이그레이션

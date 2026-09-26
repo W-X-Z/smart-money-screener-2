@@ -13,14 +13,14 @@ import time
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "api"))
-from _krx import KRX, MARKETS  # noqa: E402
-
+from batch.krx import KRX, MARKETS  # noqa: E402
 from screener import store  # noqa: E402
 from screener.kiwoom import NON_STOCK  # noqa: E402
 
 KST = timezone(timedelta(hours=9))
 MAX_CALENDAR_DAYS = 150
+FLOW_DIR = store.ROOT / "public" / "data" / "flow"
+FLOW_REFRESH_DAYS = 60  # 신호일이 이 기간 안인 종목만 차트 데이터를 매일 갱신
 
 
 def fetch_days(krx: KRX, start: str, end: str, lookback: int):
@@ -80,6 +80,23 @@ def detect(days, start, listed, min_buy, quiet_max, lookback):
     return signals
 
 
+def write_flows(krx: KRX, today: str) -> None:
+    """최근 신호 종목의 연기금 추이 차트 데이터를 정적 파일로 저장 (웹은 이 파일만 읽는다)."""
+    import json
+    cutoff = (datetime.strptime(today, "%Y%m%d") - timedelta(days=FLOW_REFRESH_DAYS)).strftime("%Y%m%d")
+    codes = sorted({s["code"] for s in store.load().values() if s["date"] >= cutoff})
+    FLOW_DIR.mkdir(parents=True, exist_ok=True)
+    for code in codes:
+        try:
+            rows = krx.pension_flow(code)
+        except Exception as e:  # 한 종목 실패가 전체 배치를 막지 않게
+            print(f"  {code} 차트 데이터 실패: {e}")
+            continue
+        (FLOW_DIR / f"{code}.json").write_text(json.dumps({"code": code, "rows": rows}, ensure_ascii=False))
+        time.sleep(0.5)
+    print(f"차트 데이터 {len(codes)}종목 갱신 -> public/data/flow/")
+
+
 def load_env() -> None:
     """Mac 에서 직접 실행할 때 .env 의 KRX_ID / KRX_PW 사용."""
     import os
@@ -107,6 +124,7 @@ def main() -> None:
     days = fetch_days(krx, args.start, args.end, args.lookback)
     if not any(d >= args.start for d, _ in days):
         print("대상 기간에 거래일 없음 (휴장)")
+        write_flows(krx, args.end)
         return
     listed = krx.listing_dates()
     signals = detect(days, args.start, listed, args.min_buy * 1e8, args.quiet_max * 1e8, args.lookback)
@@ -117,6 +135,7 @@ def main() -> None:
         if prev.get("source", "").startswith("장중"):
             s["intraday"] = prev["source"]  # 장중에 먼저 잡힌 신호였다는 기록
     store.upsert(signals)
+    write_flows(krx, args.end)
     print(f"시그널 {len(signals)}건 저장 -> {store.SIGNALS_PATH.relative_to(store.ROOT)}")
     for s in sorted(signals, key=lambda x: x["date"]):
         print(f"  {s['date']} {s['name']}({s['code']}) {s['market']} +{s['buy_eok']}억")

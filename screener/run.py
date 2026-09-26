@@ -126,15 +126,25 @@ def main() -> None:
         print(f"{mark}  " + " | ".join(str(x[c]) for c in cols))
 
     if args.push and signals:
+        write_flows([x["종목코드"] for x in signals])
         git_push(f"장중 시그널 {today} {now:%H:%M} ({len(signals)}건)")
+
+
+def write_flows(codes) -> None:
+    """장중 신호 종목의 차트 데이터를 키움 일별 수급으로 저장 (일배치가 이후 KRX 확정치로 덮어씀)."""
+    from screener.web import pension_flow
+    flow_dir = ROOT / "public" / "data" / "flow"
+    flow_dir.mkdir(parents=True, exist_ok=True)
+    for code in codes:
+        rows = pension_flow(code)
+        (flow_dir / f"{code}.json").write_text(json.dumps({"code": code, "rows": rows}, ensure_ascii=False))
 
 
 def git_push(message: str) -> None:
     import subprocess
 
-    path = str(store.SIGNALS_PATH.relative_to(ROOT))
     subprocess.run(["git", "pull", "--rebase", "--autostash", "-q"], cwd=ROOT, check=True)
-    subprocess.run(["git", "add", path], cwd=ROOT, check=True)
+    subprocess.run(["git", "add", "public/data"], cwd=ROOT, check=True)
     if subprocess.run(["git", "diff", "--cached", "--quiet"], cwd=ROOT).returncode == 0:
         return
     subprocess.run(["git", "commit", "-q", "-m", message], cwd=ROOT, check=True)
