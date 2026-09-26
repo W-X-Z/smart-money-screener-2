@@ -59,11 +59,11 @@ def call(krx: KRX, bld: str, **params) -> dict:
             krx.session = None  # 다음 호출에서 재로그인
 
 
-def pension_rows(krx: KRX, day: str) -> list:
+def pension_rows(krx: KRX, day: str, investor: int = PENSION) -> list:
     rows = []
     for mkt in MARKETS:
         out = call(krx, "dbms/MDC/STAT/standard/MDCSTAT02401",
-                   strtDd=day, endDd=day, mktId=mkt, invstTpCd=PENSION).get("output", [])
+                   strtDd=day, endDd=day, mktId=mkt, invstTpCd=investor).get("output", [])
         rows += [{"date": day, "code": r["ISU_SRT_CD"],
                   "buy": to_int(r["BID_TRDVAL"]), "sell": to_int(r["ASK_TRDVAL"])} for r in out]
         if not out and mkt == MARKETS[0]:
@@ -148,14 +148,48 @@ def collect(start: str, end: str, max_minutes: float = 50, daily: bool = False, 
     return got
 
 
+def collect_investors(investors: list, start: str, end: str, max_minutes: float = 50, krx: KRX = None) -> None:
+    """연기금 외 투자자 수급 (연구용). 시세는 기존 아카이브를 쓰므로 거래일 하루 투자자당 2회만 호출한다.
+    저장: research/archive/investors/{투자자코드}/YYYYMM.parquet (date, code, buy, sell)."""
+    calendar = json.loads(CALENDAR.read_text()) if CALENDAR.exists() else {}
+    days = sorted(d for d, v in calendar.items() if v == "open" and start <= d <= end)
+    krx = krx or KRX()
+    started, calls = time.time(), 0
+    for inv in investors:
+        kind = f"investors/{inv}"
+        files = sorted((ARCHIVE / kind).glob("*.parquet"))
+        have = set(pd.concat([pd.read_parquet(f, columns=["date"]) for f in files]).date) if files else set()
+        todo = [d for d in days if d not in have]
+        print(f"투자자 {inv}: 수집 대상 {len(todo)}일")
+        rows = []
+        try:
+            for i, day in enumerate(todo, 1):
+                if (time.time() - started) / 60 > max_minutes:
+                    print("시간 제한 도달: 저장 후 중단 (다시 실행하면 이어서 수집)")
+                    return
+                r = pension_rows(krx, day, inv)
+                calls += 2
+                rows += r
+                if i % 20 == 0:
+                    print(f"  {day}: {len(r)}종목 ({i}/{len(todo)}, 호출 {calls})")
+        finally:
+            if rows:
+                flush(kind, rows)
+    print(f"완료: KRX 호출 {calls}회, {(time.time() - started) / 60:.1f}분")
+
+
 def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("--from", dest="start", required=True)
     ap.add_argument("--to", dest="end", required=True)
     ap.add_argument("--max-minutes", type=float, default=50, help="이 시간을 넘기면 저장 후 종료 (다음 실행이 이어서 수집)")
     ap.add_argument("--daily", action="store_true", help="날짜별 파일로 저장 (일배치용)")
+    ap.add_argument("--investors", help="연기금 대신 이 투자자 코드들 수집 (쉼표 구분, 예: 3100,3000)")
     args = ap.parse_args()
-    collect(args.start, args.end, args.max_minutes, args.daily)
+    if args.investors:
+        collect_investors([int(x) for x in args.investors.split(",")], args.start, args.end, args.max_minutes)
+    else:
+        collect(args.start, args.end, args.max_minutes, args.daily)
 
 
 if __name__ == "__main__":

@@ -32,8 +32,9 @@ def read(kind: str) -> pd.DataFrame:
     return df.drop_duplicates(["date", "code"], keep="last")
 
 
-def load() -> Panel:
-    pen, px = read("pension"), read("prices")
+def load(flow: str = "pension") -> Panel:
+    """flow: "pension" 또는 연구용 "investors/{투자자코드}" (net·gross 가 그 투자자 수급이 된다)."""
+    pen, px = read(flow), read("prices")
     dates = np.array(sorted(px.date.unique()))
     codes = np.array(sorted(px.code.unique()))
     di = pd.Series(np.arange(len(dates)), index=dates)
