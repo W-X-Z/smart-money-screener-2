@@ -1,0 +1,57 @@
+name: daily-pension-signals
+
+on:
+  schedule:
+    - cron: "30 9 * * 1-5" # 평일 18:30 KST (KRX 확정치 공개 이후)
+  workflow_dispatch:
+    inputs:
+      from:
+        description: "시작일 YYYYMMDD (비우면 오늘)"
+        required: false
+      to:
+        description: "종료일 YYYYMMDD (비우면 오늘)"
+        required: false
+
+permissions:
+  contents: write
+
+concurrency:
+  group: signals-commit
+  cancel-in-progress: false
+
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - run: pip install -r requirements.txt
+
+      - name: Detect signals
+        env:
+          KRX_ID: ${{ secrets.KRX_ID }}
+          KRX_PW: ${{ secrets.KRX_PW }}
+          FROM: ${{ inputs.from }}
+          TO: ${{ inputs.to }}
+        run: |
+          ARGS=()
+          for pair in "from:$FROM" "to:$TO"; do
+            name="${pair%%:*}"; value="${pair#*:}"
+            [ -z "$value" ] && continue
+            [[ "$value" =~ ^[0-9]{8}$ ]] || { echo "잘못된 날짜: $value"; exit 1; }
+            ARGS+=("--$name" "$value")
+          done
+          python -m batch.daily "${ARGS[@]}"
+
+      - name: Commit signals
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add public/data/signals.json
+          if git diff --cached --quiet; then echo "변경 없음"; exit 0; fi
+          git commit -m "일배치 시그널 $(TZ=Asia/Seoul date +%Y-%m-%d)"
+          git pull --rebase
+          git push

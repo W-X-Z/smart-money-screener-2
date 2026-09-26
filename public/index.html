@@ -137,35 +137,21 @@ const fmtWon = (v) => `${Math.round(v).toLocaleString("ko-KR")}원`;
 const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
 let SIGNALS = [];
 
-// 로컬(python -m screener.web)에서는 로컬 API, 배포 사이트에서는 Firestore 를 읽는다
-const LOCAL = ["localhost", "127.0.0.1"].includes(location.hostname);
-const FS = "https://firestore.googleapis.com/v1/projects/smart-money-screener/databases/(default)/documents";
-
-async function fsDoc(path) {
-  const res = await fetch(`${FS}/${path}`);
-  if (res.status === 404) return null;
-  if (!res.ok) throw new Error(`Firestore ${res.status}`);
-  const f = (await res.json()).fields || {};
-  return { data: JSON.parse(f.json.stringValue), updatedAt: f.updated_at && f.updated_at.stringValue };
-}
-
+// 시그널 목록은 정적 파일, 종목 수급은 클릭 시 /api/flow 로 조회
+// (배포: Vercel 함수가 KRX 조회 / 로컬 python -m screener.web: 키움 조회)
 async function getSignals() {
-  if (LOCAL) return (await fetch("/api/signals")).json();
-  const doc = await fsDoc("pension_signals/latest");
-  if (doc && doc.updatedAt) $("#updated").textContent = ` · 업데이트 ${doc.updatedAt}`;
-  return doc ? doc.data : [];
+  const res = await fetch("/data/signals.json", { cache: "no-cache" });
+  if (!res.ok) return [];
+  const last = res.headers.get("last-modified");
+  if (last) $("#updated").textContent = ` · 업데이트 ${new Date(last).toLocaleString("ko-KR")}`;
+  return res.json();
 }
 
 async function getFlow(code) {
-  if (LOCAL) {
-    const res = await fetch(`/api/flow?code=${encodeURIComponent(code)}`);
-    const data = await res.json();
-    if (!res.ok) throw new Error(data.error || res.statusText);
-    return data.rows;
-  }
-  const doc = await fsDoc(`pension_flow/${encodeURIComponent(code)}`);
-  if (!doc) throw new Error("이 종목의 수급 데이터가 아직 업로드되지 않았습니다");
-  return doc.data;
+  const res = await fetch(`/api/flow?code=${encodeURIComponent(code)}`);
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(data.error || res.statusText);
+  return data.rows;
 }
 
 async function loadSignals() {
@@ -194,7 +180,7 @@ function renderList() {
       <td class="num buy">${fmtEok(s.buy_eok)}</td>
       <td class="num hide-sm">${s.past_max_eok.toFixed(2)}억</td>
       <td class="num hide-sm">${s.active_days}/${s.lookback}일</td>
-      <td><span class="tag ${live ? "live" : ""}">${esc(s.source)}</span></td>
+      <td><span class="tag ${live || s.intraday ? "live" : ""}">${esc(s.intraday ? `${s.intraday} → 확정` : s.source)}</span></td>
     </tr>`;
   }
   $("#rows").innerHTML = html;

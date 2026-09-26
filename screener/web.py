@@ -1,4 +1,4 @@
-"""시그널 웹 UI (로컬 서버).
+"""시그널 웹 UI 로컬 서버. 배포(Vercel)와 같은 화면을 띄우되 종목 수급은 키움에서 조회한다.
 
 사용법:
     python -m screener.web            # http://localhost:8000
@@ -18,7 +18,7 @@ from urllib.parse import parse_qs, urlparse
 from screener import store
 from screener.kiwoom import ROOT, Kiwoom, num
 
-WEB_DIR = ROOT / "web"
+PUBLIC_DIR = ROOT / "public"
 FLOW_TTL = 600  # 종목 수급 캐시 유지 시간 (초). 장중 오늘 값이 바뀌므로 짧게 둔다
 CODE = re.compile(r"^[0-9A-Z]{6}$")
 
@@ -54,10 +54,10 @@ class Handler(BaseHTTPRequestHandler):
         url = urlparse(self.path)
         try:
             if url.path == "/":
-                self._send(200, (WEB_DIR / "index.html").read_bytes(), "text/html; charset=utf-8")
-            elif url.path == "/api/signals":
-                signals = sorted(store.load().values(), key=lambda s: (s["date"], s["buy_eok"]), reverse=True)
-                self._json(200, signals)
+                self._send(200, (PUBLIC_DIR / "index.html").read_bytes(), "text/html; charset=utf-8")
+            elif url.path == "/data/signals.json":
+                body = store.SIGNALS_PATH.read_bytes() if store.SIGNALS_PATH.exists() else b"[]"
+                self._send(200, body, "application/json; charset=utf-8")
             elif url.path == "/api/flow":
                 code = parse_qs(url.query).get("code", [""])[0]
                 if not CODE.match(code):

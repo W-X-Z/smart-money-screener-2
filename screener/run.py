@@ -42,7 +42,7 @@ def main() -> None:
     ap.add_argument("--lookback", type=int, default=20, help="침묵 판단 기간 (거래일)")
     ap.add_argument("--quiet-max", type=float, default=30, help="침묵 기간 중 일별 |순매수| 상한 (백만원)")
     ap.add_argument("--show", type=int, default=15, help="진단 표에 보여줄 후보 수")
-    ap.add_argument("--publish", action="store_true", help="결과를 Firestore 에 올려 배포 웹에 반영")
+    ap.add_argument("--push", action="store_true", help="시그널 파일을 커밋·푸시해 배포 웹에 반영")
     args = ap.parse_args()
 
     now = datetime.now()
@@ -104,6 +104,8 @@ def main() -> None:
 
     signals = [x for x in rows if x["신호"]]
     meta = store.universe_meta()
+    confirmed = {k for k, v in store.load().items() if v.get("source") == "일별 확정"}
+    signals = [x for x in signals if f"{x['종목코드']}_{today}" not in confirmed]  # 확정치는 덮어쓰지 않음
     store.upsert([{
         "date": today,
         "code": x["종목코드"],
@@ -123,9 +125,21 @@ def main() -> None:
         mark = "✅" if x["신호"] else "  "
         print(f"{mark}  " + " | ".join(str(x[c]) for c in cols))
 
-    if args.publish:
-        from screener.publish import publish
-        publish(codes=[x["종목코드"] for x in signals])
+    if args.push and signals:
+        git_push(f"장중 시그널 {today} {now:%H:%M} ({len(signals)}건)")
+
+
+def git_push(message: str) -> None:
+    import subprocess
+
+    path = str(store.SIGNALS_PATH.relative_to(ROOT))
+    subprocess.run(["git", "pull", "--rebase", "--autostash", "-q"], cwd=ROOT, check=True)
+    subprocess.run(["git", "add", path], cwd=ROOT, check=True)
+    if subprocess.run(["git", "diff", "--cached", "--quiet"], cwd=ROOT).returncode == 0:
+        return
+    subprocess.run(["git", "commit", "-q", "-m", message], cwd=ROOT, check=True)
+    subprocess.run(["git", "push", "-q"], cwd=ROOT, check=True)
+    print("시그널 파일 푸시 완료 -> Vercel 자동 배포")
 
 
 if __name__ == "__main__":

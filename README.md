@@ -25,22 +25,36 @@ python -m screener.run --min-buy 300 --lookback 20 --quiet-max 30
 
 결과: `output/signals_YYYYMMDD_HHMM.csv`, 원본 응답 `output/raw_*.json`.
 
-## 웹 UI
+## 운영 구조
 
-배포 주소: **https://smart-money-pension.web.app** — 시그널 목록(최신 신호일 순), 종목 클릭 시 연기금 일별 순매수·종가 추이.
-
-키움 API 는 Mac 에서만 호출되므로, Mac 이 결과를 Firestore 에 올리고 배포 웹이 그것을 읽습니다.
-
-```bash
-# .env 에 FIREBASE_SERVICE_ACCOUNT=<서비스 계정 JSON 경로> 추가 후
-python -m screener.backfill            # 받아 둔 일별 캐시에서 과거 시그널 저장 (최초 1회)
-python -m screener.publish             # 시그널 + 종목별 수급을 Firestore 에 업로드
-python -m screener.run --publish       # 장중 스캔 후 바로 업로드
+```
+[일배치] GitHub Actions 평일 18:30 KST ── KRX 확정치 ──┐
+                                                      ├→ public/data/signals.json 커밋 → Vercel 자동 배포
+[장중]   회사 Mac (키움 잠정치) ──────────────────────┘
+[웹]     Vercel 정적 페이지 → 종목 클릭 → /api/flow (Vercel 함수, 서울 리전) → KRX
 ```
 
-로컬에서만 보려면 `python -m screener.web` (http://localhost:8000, 키움에서 직접 조회).
+DB 는 없습니다. 시그널 목록은 Git 에 커밋되는 JSON 파일 하나이고, 종목별 연기금 추이는 클릭할 때 조회합니다.
 
-웹·규칙 재배포: `python tools/deploy_firebase.py` (`firebase/firestore.rules`, `web/`). 기존 기본 사이트는 건드리지 않습니다.
+| 구성 | 파일 | 필요한 설정 |
+|---|---|---|
+| 일배치 | `batch/daily.py`, `.github/workflows/daily.yml` | GitHub Secrets `KRX_ID`, `KRX_PW` |
+| 웹 | `public/index.html`, `vercel.json` | - |
+| 클릭 조회 | `api/flow.py`, `api/_krx.py` | Vercel 환경변수 `KRX_ID`, `KRX_PW` |
+| 장중 | `screener/run.py --push` | Mac `.env` 키움 키, `git push` 가능 |
+
+### 최근 한 달 마이그레이션
+
+GitHub → Actions → daily-pension-signals → Run workflow 에서 `from` / `to` 입력 (예: 20260826 / 20260925).
+Mac 에서 직접: `.env` 에 `KRX_ID`, `KRX_PW` 추가 후 `python -m batch.daily --from 20260826 --to 20260925`.
+
+### 장중 (Mac)
+
+```bash
+python -m screener.run --push   # 스캔 → 시그널 파일 커밋·푸시 → 웹 반영
+```
+
+로컬 미리보기: `python -m screener.web` (http://localhost:8000, 종목 추이는 키움에서 조회).
 
 ## 과거 검증 (backscan)
 
