@@ -1,6 +1,6 @@
 """연기금 '침묵 후 급증' 시그널의 속성·기본 포착·필터 (운영 일배치, 장중 스캔, 검증이 함께 사용).
 
-기본 포착(넓게): 오늘 연기금 순매수 > 0, 1~2일 누적 1억 이상, 직전 20거래일 중 |순매수| 0.3억 초과인 날 2일 이하.
+기본 포착(전체): 오늘 연기금 순매수 > 0, 1~2일 누적 1억 이상, 직전 20거래일 중 |순매수| 0.3억 초과인 날 2일 이하.
 필터(좁히기): 금액 하한, 침묵 강도, 규모 대비(5억 미만이면 거래대금 5% 이상), 2일 누적 인정, 우선주 제외.
 웹(public/index.html)의 필터 계산은 mask() 와 같은 규칙이다.
 """
@@ -24,8 +24,8 @@ AMOUNTS = (1, 3, 5)
 SILENCES = (0, 1, 2)
 PRESETS = {
     "추천": dict(amount=3, silence=0, scale=True, two_day=True, pref=True),
-    "균형": dict(amount=3, silence=1, scale=True, two_day=True, pref=True),
-    "넓게": dict(amount=1, silence=2, scale=False, two_day=True, pref=True),
+    "넓게": dict(amount=3, silence=1, scale=True, two_day=True, pref=True),
+    "전체": dict(amount=1, silence=2, scale=False, two_day=True, pref=True),
 }
 
 

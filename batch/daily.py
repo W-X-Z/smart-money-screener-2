@@ -1,7 +1,7 @@
 """일배치: KRX 확정치를 아카이브에 쌓고(거래일 하루 KRX 4회), 아카이브로 시그널을 계산해 public/data 에 저장.
 
 1. research/archive 에 최근 거래일 수집 (이미 받은 날은 건너뜀, 오늘은 값이 바뀔 수 있어 다시 받음)
-2. engine/signals.py 의 기본 포착(넓게)으로 시그널과 필터용 속성 계산 -> public/data/signals.json
+2. engine/signals.py 의 기본 포착(전체)으로 시그널과 필터용 속성 계산 -> public/data/signals.json
 3. 신호 후 수익률 갱신, 신호 종목의 차트 데이터 -> public/data/flow/{코드}.json
 웹은 이 파일들만 읽는다 (방문자는 KRX 를 호출하지 않음).
 

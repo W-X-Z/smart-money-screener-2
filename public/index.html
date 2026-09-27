@@ -380,7 +380,8 @@ async function open(key, from) {
   lastFocus = from;
   const s = SIGNALS.find((x) => `${x.code}_${x.date}` === key);
   $("#p-name").textContent = s.name;
-  $("#p-sub").textContent = `${s.code}${s.market ? " · " + s.market : ""} · ${+s.date.slice(4, 6)}월 ${+s.date.slice(6, 8)}일 매수`;
+  $("#p-sub").textContent = `${s.code}${s.market ? " · " + s.market : ""} · ${+s.date.slice(4, 6)}월 ${+s.date.slice(6, 8)}일 매수`
+    + ((s.first_seen || s.intraday) ? ` · ${s.first_seen || s.intraday} 포착` : "");
   const ret = s.ret_pct;
   $("#p-body").innerHTML = `
     <div class="kpis">

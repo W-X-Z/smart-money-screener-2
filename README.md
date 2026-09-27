@@ -19,14 +19,14 @@ DB 는 없습니다. 원천 데이터(`research/archive`)와 웹 데이터(`publ
 | 공통 규칙 | `engine/archive.py`, `engine/signals.py` | - |
 | 일배치 | `batch/daily.py`, `research/collect.py`, `.github/workflows/daily.yml` | GitHub Secrets `KRX_ID`, `KRX_PW` |
 | 웹 | `public/index.html`, `vercel.json` | - |
-| 장중 | `screener/run.py` | Mac `.env` 키움 키, `git push` 가능 |
+| 장중 | `screener/run.py`, `screener/loop.py`, `tools/install_intraday.sh` | Mac `.env` 키움 키, `git push` 가능 |
 | 검증 | `research/evaluate.py`, `research/filter_stats.py` | - |
 
 ## 시그널 규칙
 
 - **기본 포착 (넓게)**: 오늘 연기금 순매수 > 0, 1~2일 누적 순매수 1억 이상, 직전 20거래일 중 |순매수| 0.3억 초과인 날 2일 이하. 전날도 0.3억 넘게 샀으면 2일 누적으로 보고 침묵 구간을 하루 앞당긴다.
 - **필터 (웹에서 선택)**: 금액 하한(1/3/5억), 침묵(0.3억 초과일 0/1/2일 이하), 규모 대비(5억 미만이면 거래대금 5% 이상), 2일 연속 매수 포함, 우선주 포함, 시장. 같은 종목은 20거래일 안의 재신호를 뺀다.
-- **프리셋**: 추천(3억·0일·규모 대비), 균형(3억·1일 이하·규모 대비), 넓게(기본 포착 전체).
+- **프리셋**: 추천(3억·0일·규모 대비), 넓게(3억·1일 이하·규모 대비), 전체(기본 포착 전체).
 - 필터 조합 72개의 과거 2년 성과(`public/data/filter_stats.json`)를 웹에 함께 보여준다.
 
 검증 결과: `research/results/REPORT.md`
@@ -38,9 +38,19 @@ python3 -m venv .venv && source .venv/bin/activate
 pip install -r requirements.txt
 cp .env.example .env && open -e .env   # KIWOOM_APP_KEY / KIWOOM_SECRET_KEY 입력
 
-python -m screener.run          # 장중 스캔 (git pull 후 아카이브 + 키움 잠정치)
-python -m screener.run --push   # 스캔 결과를 커밋·푸시해 웹에 반영
+python -m screener.run          # 한 번 스캔 (git pull 후 아카이브 + 키움 잠정치)
+python -m screener.run --push   # 한 번 스캔 + 커밋·푸시해 웹에 반영
+python -m screener.loop         # 장중 반복: 09:05~15:40 20분마다 스캔·푸시 (잠정치가 그대로면 건너뜀)
+
+bash tools/install_intraday.sh          # 평일 08:55 에 loop 자동 시작 (launchd, 잠자기 방지 포함)
+bash tools/install_intraday.sh remove   # 자동 시작 해제
+tail -f output/intraday.log             # 로그 보기
 ```
+
+- 오늘 장중 신호는 스캔할 때마다 새 결과로 바뀌어요. 앞 스캔에서 잡혔다가 연기금이 되판 종목은 빠지고, 처음 잡힌 시각은 남아요.
+- 장 마감 후 일배치가 확정치로 다시 계산하면 확정치에 없는 장중 신호는 지워져요.
+- 스캔할 때마다 잠정치를 `research/intraday/YYYYMMDD.parquet` 에 쌓아요 (장중 값이 확정치와 얼마나 맞는지 나중에 검증용).
+- Mac 이 꺼져 있거나 잠자기 상태면 스캔하지 않아요. 덮개를 닫으면 잠들 수 있으니 전원에 연결해 두세요.
 
 로컬 미리보기: `python -m screener.web` (http://localhost:8000).
 

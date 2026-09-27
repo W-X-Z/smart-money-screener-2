@@ -31,34 +31,41 @@ def save(data: Dict[str, dict]) -> None:
     write_csv(rows)
 
 
-def upsert(signals: List[dict]) -> int:
-    """종목코드+신호일 기준으로 추가/갱신 (장중 스캔용). 일별 확정 신호는 장중 값으로 덮어쓰지 않는다."""
+def replace_intraday(date: str, signals: List[dict]) -> int:
+    """오늘(date) 장중 신호를 최신 스캔 결과로 교체. 앞선 스캔에서 잡혔다가 빠진 종목은 지우고,
+    처음 잡힌 시각(first_seen)은 남긴다. 일별 확정 신호는 건드리지 않는다."""
     data = load()
     now = now_kst()
+    keys = {f"{s['code']}_{s['date']}" for s in signals}
+    for k, v in list(data.items()):
+        if v["date"] == date and v.get("source", "").startswith("장중") and k not in keys:
+            del data[k]
     n = 0
     for s in signals:
         key = f"{s['code']}_{s['date']}"
-        if data.get(key, {}).get("source") == CONFIRMED:
+        prev = data.get(key, {})
+        if prev.get("source") == CONFIRMED:
             continue
-        data[key] = {**data.get(key, {}), **s, "updated_at": now}
+        data[key] = {**prev, **s, "first_seen": prev.get("first_seen", s["source"]), "updated_at": now}
         n += 1
     save(data)
     return n
 
 
 def replace_confirmed(start: str, end: str, signals: List[dict]) -> None:
-    """start~end 의 일별 확정 신호를 새 계산 결과로 교체. 장중에 먼저 잡힌 신호는 표시를 남긴다."""
+    """start~end 의 신호를 확정치 계산 결과로 교체. 확정치에 없는 장중 신호도 지우고,
+    장중에 먼저 잡힌 신호는 처음 잡힌 시각을 남긴다."""
     data = load()
     now = now_kst()
     keys = {f"{s['code']}_{s['date']}" for s in signals}
     for k, v in list(data.items()):
-        if start <= v["date"] <= end and v.get("source") == CONFIRMED and k not in keys:
+        if start <= v["date"] <= end and k not in keys:
             del data[k]
     for s in signals:
         key = f"{s['code']}_{s['date']}"
         prev = data.get(key, {})
         if prev.get("source", "").startswith("장중"):
-            s = {**s, "intraday": prev["source"]}
+            s = {**s, "intraday": prev.get("first_seen", prev["source"])}
         data[key] = {**prev, **s, "updated_at": now}
     save(data)
 

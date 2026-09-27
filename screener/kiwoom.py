@@ -128,7 +128,7 @@ class Kiwoom:
         return self.call("/api/dostk/mrkcond", "ka10063", {
             "mrkt_tp": mrkt_tp, "amt_qty_tp": "1", "invsr": invsr,
             "frgn_all": "0", "smtm_netprps_tp": "0", "stex_tp": "1",
-        }, "opmr_invsr_trde", max_pages=5)
+        }, "opmr_invsr_trde", max_pages=30)
 
     def intraday_top_pension(self, mrkt_tp: str) -> List[Dict]:
         """ka10065 장중투자자별매매상위 - 연기금(6000) 순매수. 수량 단위 주."""
