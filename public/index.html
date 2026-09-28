@@ -60,30 +60,12 @@ h1 { font-size: 22px; font-weight: 700; letter-spacing: -0.02em; margin: 0; }
 .seg { display: inline-flex; background: var(--control); border-radius: 10px; padding: 3px; flex: none; }
 .seg button { border: 0; background: none; padding: 6px 12px; border-radius: 8px; font-size: 14px; color: var(--text-2); cursor: pointer; white-space: nowrap; }
 .seg.sm button { padding: 5px 10px; font-size: 13px; }
-.fbtn { display: inline-flex; align-items: center; gap: 6px; height: 36px; padding: 0 12px; border: 1px solid var(--border); border-radius: 10px; background: var(--surface); cursor: pointer; font-size: 14px; color: var(--text-2); flex: none; }
-.fbtn svg { width: 16px; height: 16px; stroke: currentColor; }
-.fbtn .dot { width: 6px; height: 6px; border-radius: 50%; background: var(--buy); display: none; }
-.fbtn.custom .dot { display: inline-block; }
-.fbtn[aria-expanded="true"] { color: var(--text); border-color: var(--text-3); }
-.fcard { display: none; background: var(--surface); border: 1px solid var(--border); border-radius: 14px; padding: 4px 16px; margin-bottom: 12px; }
-.fcard.open { display: block; }
-.frow { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 10px 0; }
-.frow + .frow { border-top: 1px solid var(--border); }
-.frow .lbl { font-size: 14px; color: var(--text); }
-.frow .lbl small { display: block; font-size: 12px; color: var(--text-3); margin-top: 1px; }
-.switch { appearance: none; -webkit-appearance: none; width: 40px; height: 24px; margin: 0; border-radius: 999px; background: var(--control); position: relative; cursor: pointer; flex: none; transition: background .15s; }
-.switch::after { content: ""; position: absolute; top: 3px; left: 3px; width: 18px; height: 18px; border-radius: 50%; background: #fff; box-shadow: 0 1px 2px rgba(0,0,0,.25); transition: transform .15s; }
-.switch:checked { background: var(--focus); }
-.switch:checked::after { transform: translateX(16px); }
-.switch:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
 .info { border: 0; background: none; padding: 0 2px; margin-left: 2px; cursor: pointer; color: var(--text-3); vertical-align: -3px; line-height: 0; }
 .info svg { width: 15px; height: 15px; stroke: currentColor; }
 .info[aria-expanded="true"] { color: var(--text); }
 .pop { position: fixed; z-index: 20; max-width: 260px; background: var(--text); color: var(--bg); font-size: 13px; line-height: 1.5; padding: 9px 12px; border-radius: 10px; box-shadow: var(--shadow); display: none; }
 .pop.open { display: block; }
 [hidden] { display: none !important; }
-.fstats { font-size: 13px; color: var(--text-3); font-variant-numeric: tabular-nums; }
-.fstats b { color: var(--text); font-weight: 600; }
 .coach { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); background: var(--text); color: var(--bg); font-size: 13px; padding: 7px 12px; border-radius: 999px; pointer-events: none; white-space: nowrap; opacity: .92; transition: opacity .4s; }
 .coach.hide { opacity: 0; }
 .pill.mute { color: var(--text-3); }
@@ -123,7 +105,7 @@ svg.c { touch-action: pan-y; user-select: none; -webkit-user-select: none; curso
 .empty { text-align: center; color: var(--text-3); padding: 64px 0; }
 
 /* panel */
-.scrim { position: fixed; inset: 0; background: rgba(0,0,0,.35); opacity: 0; pointer-events: none; transition: opacity .2s; z-index: 10; }
+.scrim { touch-action: none; position: fixed; inset: 0; background: rgba(0,0,0,.35); opacity: 0; pointer-events: none; transition: opacity .2s; z-index: 10; }
 .scrim.open { opacity: 1; pointer-events: auto; }
 .panel {
   position: fixed; top: 0; right: 0; bottom: 0; width: min(560px, 100%); background: var(--surface);
@@ -136,7 +118,7 @@ svg.c { touch-action: pan-y; user-select: none; -webkit-user-select: none; curso
 .panel-h .sub { color: var(--text-3); font-size: 13px; margin-top: 2px; }
 .x { border: 0; background: var(--surface-2); width: 32px; height: 32px; border-radius: 50%; cursor: pointer; display: grid; place-items: center; flex: none; }
 .x svg { width: 14px; height: 14px; stroke: var(--text-2); }
-.panel-b { padding: 12px 22px 28px; overflow-y: auto; }
+.panel-b { padding: 12px 22px 28px; overflow-y: auto; overscroll-behavior: contain; flex: 1; }
 .kpis { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; margin: 8px 0 22px; }
 .kpi .s { font-size: 12px; color: var(--text-3); margin-top: 1px; }
 .kpi { background: var(--surface-2); border-radius: 12px; padding: 12px; }
@@ -153,23 +135,23 @@ svg.c text { fill: var(--text-3); font-size: 11px; font-family: inherit; }
 .tip b { display: block; margin-bottom: 2px; }
 .tip span { color: var(--text-2); display: block; }
 .link { border: 0; background: none; color: var(--text-3); font-size: 13px; cursor: pointer; padding: 0; text-decoration: underline; text-underline-offset: 3px; }
-.dt { margin-top: 10px; display: none; max-height: 280px; overflow: auto; border-radius: 10px; border: 1px solid var(--border); }
+.dt { margin-top: 10px; display: none; border-radius: 10px; border: 1px solid var(--border); }
 .dt.open { display: block; }
 .dt table { width: 100%; border-collapse: collapse; font-size: 13px; font-variant-numeric: tabular-nums; }
 .dt th, .dt td { padding: 7px 12px; text-align: right; border-bottom: 1px solid var(--border); }
 .dt th:first-child, .dt td:first-child { text-align: left; }
-.dt th { color: var(--text-3); font-weight: 500; position: sticky; top: 0; background: var(--surface); }
+.dt th { color: var(--text-3); font-weight: 500; position: sticky; top: -12px; background: var(--surface); box-shadow: 0 1px 0 var(--border); }
 .state { color: var(--text-3); text-align: center; padding: 60px 0; }
 
 @media (max-width: 600px) {
   .wrap { padding: 20px 16px 48px; }
   .toolbar { flex-wrap: wrap; }
   .search { flex-basis: 100%; order: 3; }
-  .frow { flex-wrap: wrap; }
   .panel { top: auto; width: 100%; height: 88vh; border-radius: 18px 18px 0 0; transform: translateY(100%); }
   .panel.open { transform: none; }
   .panel-h { padding: 18px 16px 4px; }
   .panel-b { padding: 10px 16px 28px; }
+  .dt th { top: -10px; }
 }
 @media (prefers-reduced-motion: reduce) { .panel, .scrim { transition: none; } }
 </style>
@@ -182,31 +164,15 @@ svg.c text { fill: var(--text-3); font-size: 11px; font-family: inherit; }
   </header>
 
   <div class="toolbar">
-    <div class="seg" id="presets" role="group" aria-label="보기 범위">
-      <button data-p="추천" aria-pressed="true">추천</button>
-      <button data-p="넓게" aria-pressed="false">넓게</button>
-      <button data-p="전체" aria-pressed="false">전체</button>
+    <div class="seg" id="market" role="group" aria-label="시장">
+      <button data-v="" aria-pressed="true">전체</button>
+      <button data-v="코스피" aria-pressed="false">코스피</button>
+      <button data-v="코스닥" aria-pressed="false">코스닥</button>
     </div>
-    <button class="fbtn" id="fbtn" aria-expanded="false" aria-controls="fcard">
-      <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round"><path d="M4 7h10M18 7h2M4 17h4M12 17h8"/><circle cx="16" cy="7" r="2"/><circle cx="10" cy="17" r="2"/></svg>필터<span class="dot"></span>
-    </button>
     <label class="search">
       <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
       <input id="q" type="search" placeholder="종목명·코드 검색" aria-label="종목명이나 코드로 검색">
     </label>
-  </div>
-
-  <div class="fcard" id="fcard">
-    <div class="frow"><div class="lbl">연기금 매수 금액<i data-tip="이틀 연속 샀다면 두 날을 합쳐요."></i></div>
-      <div class="seg sm" data-f="amount" role="group" aria-label="연기금 매수 금액"><button data-v="1">1억 이상</button><button data-v="3">3억 이상</button><button data-v="5">5억 이상</button></div></div>
-    <div class="frow"><div class="lbl">사기 전 한 달간 연기금 거래<i data-tip="매수일 전 20거래일 중 연기금이 3천만 원 넘게 사고판 날 수예요."></i></div>
-      <div class="seg sm" data-f="silence" role="group" aria-label="사기 전 한 달간 연기금 거래"><button data-v="0">없음</button><button data-v="1">하루까지</button><button data-v="2">이틀까지</button></div></div>
-    <div class="frow"><div class="lbl">규모에 비해 작은 매수 빼기<i data-tip="5억 미만 매수는 평소 하루 거래대금의 5%를 넘을 때만 보여요."></i></div><input type="checkbox" class="switch" data-f="scale" aria-label="규모에 비해 작은 매수 빼기"></div>
-    <div class="frow"><div class="lbl">이틀 연속 산 종목도 보기</div><input type="checkbox" class="switch" data-f="two_day" aria-label="이틀 연속 산 종목도 보기"></div>
-    <div class="frow"><div class="lbl">우선주도 보기</div><input type="checkbox" class="switch" data-f="pref" aria-label="우선주도 보기"></div>
-    <div class="frow"><div class="lbl">시장</div>
-      <div class="seg sm" data-f="market" role="group" aria-label="시장"><button data-v="">전체</button><button data-v="코스피">코스피</button><button data-v="코스닥">코스닥</button></div></div>
-    <div class="frow fstats" id="stats"></div>
   </div>
 
   <main id="list"><div class="empty">불러오고 있어요</div></main>
@@ -250,30 +216,22 @@ document.addEventListener("click", (e) => {
 addEventListener("scroll", hidePop, true);
 addEventListener("resize", hidePop);
 
-const PRESETS = {
-  추천: { amount: 3, silence: 0, scale: true, two_day: true, pref: true },
-  넓게: { amount: 3, silence: 1, scale: true, two_day: true, pref: true },
-  전체: { amount: 1, silence: 2, scale: false, two_day: true, pref: true },
-};
+// 보여줄 신호 규칙: engine/signals.py PRESETS["추천"] 과 같다 (2년 검증에서 고른 조건)
+const RULE = { amount: 3, silence: 0, scale: true, two_day: true, pref: true };
 const COOLDOWN = 20; // 같은 종목 재신호 억제 (거래일), engine/signals.py 와 동일
-let SIGNALS = [], STATS = null, CURRENT = null, UPDATED = "";
-let F = { ...PRESETS["추천"], market: "" };
-try { const saved = JSON.parse(localStorage.getItem("pension-filter") || "null"); if (saved) F = { ...F, ...saved }; } catch (e) {}
+let SIGNALS = [], CURRENT = null, UPDATED = "";
+const F = { ...RULE, market: "" };
+try { F.market = localStorage.getItem("pension-market") || ""; } catch (e) {}
 
 async function load() {
-  const [res, st] = await Promise.all([
-    fetch("/data/signals.json", { cache: "no-cache" }),
-    fetch("/data/filter_stats.json", { cache: "no-cache" }).catch(() => null),
-  ]);
+  const res = await fetch("/data/signals.json", { cache: "no-cache" });
   SIGNALS = res.ok ? await res.json() : [];
-  STATS = st && st.ok ? await st.json() : null;
   const last = res.headers.get("last-modified");
   const upd = last ? new Date(last) : null;
   UPDATED = upd ? ` · ${upd.getMonth() + 1}/${upd.getDate()} ${String(upd.getHours()).padStart(2, "0")}:${String(upd.getMinutes()).padStart(2, "0")} 기준` : "";
   syncControls(); render();
 }
 
-const presetOf = () => Object.keys(PRESETS).find((k) => ["amount", "silence", "scale", "two_day", "pref"].every((f) => PRESETS[k][f] === F[f]));
 // engine/signals.py mask() 와 같은 규칙
 const passes = (s) => s.buy_eok >= F.amount && (s.big_days ?? 0) <= F.silence
   && (!F.scale || s.buy_eok >= 5 || (s.adv_pct ?? 0) >= 5)
@@ -290,26 +248,9 @@ function filtered() {
 }
 
 function syncControls() {
-  const p = presetOf();
-  document.querySelectorAll("#presets button").forEach((b) => b.setAttribute("aria-pressed", b.dataset.p === p));
-  $("#fbtn").classList.toggle("custom", !p || !!F.market);
-  document.querySelectorAll(".fcard .seg").forEach((g) => g.querySelectorAll("button").forEach((b) =>
-    b.setAttribute("aria-pressed", String(F[g.dataset.f]) === b.dataset.v)));
-  document.querySelectorAll(".fcard .switch").forEach((c) => { c.checked = !!F[c.dataset.f]; });
-  try { localStorage.setItem("pension-filter", JSON.stringify(F)); } catch (e) {}
+  document.querySelectorAll("#market button").forEach((b) => b.setAttribute("aria-pressed", b.dataset.v === F.market));
+  try { localStorage.setItem("pension-market", F.market); } catch (e) {}
 }
-
-function renderStats() {
-  const key = `a${F.amount}_s${F.silence}_r${+F.scale}_d${+F.two_day}_p${+F.pref}`;
-  const s = STATS && STATS.stats[key];
-  $("#stats").hidden = !(s && s.x20); if (!s || !s.x20) return;
-  const pct = (v) => `${v > 0 ? "+" : ""}${v.toFixed(1)}%`;
-  const base = STATS.baseline && STATS.baseline.x20 ? STATS.baseline.x20.mean : null;
-  const more = `지난 2년 기준이에요. 다음 날 시가에 사서 한 달(20거래일) 뒤 같은 시장·비슷한 시총 종목과 비교한 중간값이에요. `
-    + `평균 ${pct(s.x20.mean)}${base != null ? ` (아무 종목이나 샀다면 ${pct(base)})` : ""}, 시장보다 오른 종목 ${s.x20.win}%.`;
-  $("#stats").innerHTML = `<span>이 조건이면 주 <b>${s.per_week}건</b> · 한 달 뒤 시장보다 <b>${pct(s.x20.median)}</b>${info(more)}</span>`;
-}
-
 
 const PAGE = 30;
 let LIST = [], SHOWN = 0;
@@ -332,13 +273,12 @@ function more() {
 const io = new IntersectionObserver((es) => { if (es.some((e) => e.isIntersecting)) more(); }, { rootMargin: "400px" });
 
 function render() {
-  renderStats();
   const q = $("#q").value.trim().toLowerCase();
   const list = filtered().filter((s) => !q || s.name.toLowerCase().includes(q) || s.code.includes(q));
   $("#meta").textContent = `${list.length}건${UPDATED}`;
   if (!list.length) {
     $("#list").innerHTML = `<div class="empty">${!SIGNALS.length ? "아직 잡힌 종목이 없어요. 평일 오후 4시 10분에 업데이트돼요."
-      : q ? `‘${esc(q)}’에 맞는 종목이 없어요. 필터를 넓혀서 찾아보세요.` : "이 조건에 맞는 종목이 없어요. 넓게나 전체를 눌러 보세요."}</div>`;
+      : q ? `‘${esc(q)}’에 맞는 종목이 없어요. 종목명이나 코드를 다시 확인해 주세요.` : `${F.market}에서 잡힌 종목이 아직 없어요. 전체를 눌러 보세요.`}</div>`;
     return;
   }
   LIST = list; SHOWN = 0;
@@ -347,28 +287,29 @@ function render() {
   io.disconnect(); io.observe($("#more"));
 }
 
-document.querySelectorAll("#presets button").forEach((b) => b.addEventListener("click", () => {
-  F = { ...F, ...PRESETS[b.dataset.p] }; syncControls(); render();
-}));
-$("#fbtn").addEventListener("click", () => {
-  const open = $("#fcard").classList.toggle("open");
-  $("#fbtn").setAttribute("aria-expanded", open);
-});
-document.querySelectorAll(".fcard .seg").forEach((g) => g.addEventListener("click", (e) => {
+$("#market").addEventListener("click", (e) => {
   const b = e.target.closest("button"); if (!b) return;
-  F[g.dataset.f] = g.dataset.f === "market" ? b.dataset.v : +b.dataset.v; syncControls(); render();
-}));
-document.querySelectorAll(".fcard .switch").forEach((c) => c.addEventListener("change", () => {
-  F[c.dataset.f] = c.checked; syncControls(); render();
-}));
+  F.market = b.dataset.v; syncControls(); render();
+});
 $("#q").addEventListener("input", render);
 $("#list").addEventListener("click", (e) => { const b = e.target.closest(".item"); if (b) open(b.dataset.key, b); });
 
 // ---------- panel ----------
 let lastFocus = null;
+// 상세가 열려 있는 동안 뒤 목록은 스크롤되지 않게 (스크롤바가 사라지며 화면이 밀리지 않도록 폭 보정)
+function lockScroll(on) {
+  const root = document.documentElement;
+  if (on && root.style.overflow !== "hidden") {
+    root.style.paddingRight = `${innerWidth - root.clientWidth}px`;
+    root.style.overflow = "hidden";
+  } else if (!on) {
+    root.style.overflow = ""; root.style.paddingRight = "";
+  }
+}
 function close() {
   $("#panel").classList.remove("open"); $("#scrim").classList.remove("open");
   $("#panel").setAttribute("aria-hidden", "true"); CURRENT = null;
+  lockScroll(false);
   if (lastFocus) lastFocus.focus();
 }
 $("#close").addEventListener("click", close);
@@ -393,6 +334,7 @@ async function open(key, from) {
     <div class="state" id="p-state">차트를 불러오고 있어요</div>`;
   $("#panel").classList.add("open"); $("#scrim").classList.add("open");
   $("#panel").setAttribute("aria-hidden", "false"); $("#close").focus();
+  lockScroll(true); $("#p-body").scrollTop = 0;
   try {
     const res = await fetch(`/data/flow/${encodeURIComponent(s.code)}.json`, { cache: "no-cache" }).catch(() => null);
     if (!res) throw new Error("차트를 불러오지 못했어요. 잠시 후 다시 열어 주세요.");
