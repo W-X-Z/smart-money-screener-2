@@ -68,6 +68,24 @@ h1 { font-size: 22px; font-weight: 700; letter-spacing: -0.02em; margin: 0; }
 [hidden] { display: none !important; }
 .coach { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); background: var(--text); color: var(--bg); font-size: 13px; padding: 7px 12px; border-radius: 999px; pointer-events: none; white-space: nowrap; opacity: .92; transition: opacity .4s; }
 .coach.hide { opacity: 0; }
+.fbtn { display: inline-flex; align-items: center; gap: 6px; height: 36px; padding: 0 12px; border: 1px solid var(--border); border-radius: 10px; background: var(--surface); cursor: pointer; font-size: 14px; color: var(--text-2); flex: none; }
+.fbtn svg { width: 16px; height: 16px; stroke: currentColor; }
+.fbtn .dot { width: 6px; height: 6px; border-radius: 50%; background: var(--buy); display: none; }
+.fbtn.custom .dot { display: inline-block; }
+.fbtn[aria-expanded="true"] { color: var(--text); border-color: var(--text-3); }
+.fcard { display: none; background: var(--surface); border: 1px solid var(--border); border-radius: 14px; padding: 4px 16px; margin-bottom: 12px; }
+.fcard.open { display: block; }
+.frow { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 10px 0; }
+.frow + .frow { border-top: 1px solid var(--border); }
+.frow .lbl { font-size: 14px; color: var(--text); }
+.frow .lbl small { display: block; font-size: 12px; color: var(--text-3); margin-top: 1px; }
+.switch { appearance: none; -webkit-appearance: none; width: 40px; height: 24px; margin: 0; border-radius: 999px; background: var(--control); position: relative; cursor: pointer; flex: none; transition: background .15s; }
+.switch::after { content: ""; position: absolute; top: 3px; left: 3px; width: 18px; height: 18px; border-radius: 50%; background: #fff; box-shadow: 0 1px 2px rgba(0,0,0,.25); transition: transform .15s; }
+.switch:checked { background: var(--focus); }
+.switch:checked::after { transform: translateX(16px); }
+.switch:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+.fstats { justify-content: space-between; font-size: 13px; color: var(--text-3); font-variant-numeric: tabular-nums; }
+.fstats b { color: var(--text); font-weight: 600; }
 .pill.mute { color: var(--text-3); }
 .more { text-align: center; color: var(--text-3); font-size: 13px; padding: 16px 0; }
 .ct .rng { display: inline-flex; gap: 2px; font-weight: 500; }
@@ -100,7 +118,9 @@ svg.c { touch-action: pan-y; user-select: none; -webkit-user-select: none; curso
 .item .name { font-weight: 600; font-size: 16px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .item .sub { font-size: 13px; color: var(--text-3); margin-top: 1px; }
 .pill { display: inline-block; font-size: 11px; font-weight: 600; color: var(--buy); border: 1px solid currentColor; border-radius: 999px; padding: 0 6px; margin-left: 6px; vertical-align: 2px; }
-.amt { font-weight: 700; font-size: 16px; font-variant-numeric: tabular-nums; color: var(--buy); white-space: nowrap; }
+.amt { font-weight: 700; font-size: 16px; font-variant-numeric: tabular-nums; color: var(--buy); white-space: nowrap; text-align: right; }
+.chg { display: block; font-size: 12px; font-weight: 500; color: var(--text-3); margin-top: 1px; }
+.chg.up { color: var(--buy); } .chg.down { color: var(--sell); }
 .chev { width: 16px; height: 16px; stroke: var(--text-3); flex: none; }
 .empty { text-align: center; color: var(--text-3); padding: 64px 0; }
 
@@ -150,6 +170,7 @@ svg.c text { fill: var(--text-3); font-size: 11px; font-family: inherit; }
   .panel { top: auto; width: 100%; height: 88vh; border-radius: 18px 18px 0 0; transform: translateY(100%); }
   .panel.open { transform: none; }
   .panel-h { padding: 18px 16px 4px; }
+  .frow { flex-wrap: wrap; }
   .panel-b { padding: 10px 16px 28px; }
   .dt th { top: -10px; }
 }
@@ -169,10 +190,24 @@ svg.c text { fill: var(--text-3); font-size: 11px; font-family: inherit; }
       <button data-v="코스피" aria-pressed="false">코스피</button>
       <button data-v="코스닥" aria-pressed="false">코스닥</button>
     </div>
+    <button class="fbtn" id="fbtn" aria-expanded="false" aria-controls="fcard">
+      <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round"><path d="M4 7h10M18 7h2M4 17h4M12 17h8"/><circle cx="16" cy="7" r="2"/><circle cx="10" cy="17" r="2"/></svg>필터<span class="dot"></span>
+    </button>
     <label class="search">
       <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
       <input id="q" type="search" placeholder="종목명·코드 검색" aria-label="종목명이나 코드로 검색">
     </label>
+  </div>
+
+  <div class="fcard" id="fcard">
+    <div class="frow"><div class="lbl">연기금 매수 금액<i data-tip="이틀 연속 샀다면 두 날을 합쳐요."></i></div>
+      <div class="seg sm" data-f="amount" role="group" aria-label="연기금 매수 금액"><button data-v="1">1억 이상</button><button data-v="3">3억 이상</button><button data-v="5">5억 이상</button></div></div>
+    <div class="frow"><div class="lbl">사기 전 한 달간 연기금 거래<i data-tip="매수일 전 20거래일 중 연기금이 3천만 원 넘게 사고판 날 수예요."></i></div>
+      <div class="seg sm" data-f="silence" role="group" aria-label="사기 전 한 달간 연기금 거래"><button data-v="0">없음</button><button data-v="1">하루까지</button><button data-v="2">이틀까지</button></div></div>
+    <div class="frow"><div class="lbl">규모에 비해 작은 매수 빼기<i data-tip="5억 미만 매수는 평소 하루 거래대금의 5%를 넘을 때만 보여요."></i></div><input type="checkbox" class="switch" data-f="scale" aria-label="규모에 비해 작은 매수 빼기"></div>
+    <div class="frow"><div class="lbl">이틀 연속 산 종목도 보기</div><input type="checkbox" class="switch" data-f="two_day" aria-label="이틀 연속 산 종목도 보기"></div>
+    <div class="frow"><div class="lbl">우선주도 보기</div><input type="checkbox" class="switch" data-f="pref" aria-label="우선주도 보기"></div>
+    <div class="frow fstats"><span id="stats"></span><button class="link" id="reset" type="button">기본값으로</button></div>
   </div>
 
   <main id="list"><div class="empty">불러오고 있어요</div></main>
@@ -219,13 +254,18 @@ addEventListener("resize", hidePop);
 // 보여줄 신호 규칙: engine/signals.py PRESETS["추천"] 과 같다 (2년 검증에서 고른 조건)
 const RULE = { amount: 3, silence: 0, scale: true, two_day: true, pref: true };
 const COOLDOWN = 20; // 같은 종목 재신호 억제 (거래일), engine/signals.py 와 동일
-let SIGNALS = [], CURRENT = null, UPDATED = "";
-const F = { ...RULE, market: "" };
-try { F.market = localStorage.getItem("pension-market") || ""; } catch (e) {}
+let SIGNALS = [], STATS = null, CURRENT = null, UPDATED = "";
+let F = { ...RULE, market: "" };
+try { const saved = JSON.parse(localStorage.getItem("pension-filter") || "null"); if (saved) F = { ...F, ...saved }; } catch (e) {}
+const isDefault = () => Object.keys(RULE).every((k) => F[k] === RULE[k]);
 
 async function load() {
-  const res = await fetch("/data/signals.json", { cache: "no-cache" });
+  const [res, st] = await Promise.all([
+    fetch("/data/signals.json", { cache: "no-cache" }),
+    fetch("/data/filter_stats.json", { cache: "no-cache" }).catch(() => null),
+  ]);
   SIGNALS = res.ok ? await res.json() : [];
+  STATS = st && st.ok ? await st.json() : null;
   const last = res.headers.get("last-modified");
   const upd = last ? new Date(last) : null;
   UPDATED = upd ? ` · ${upd.getMonth() + 1}/${upd.getDate()} ${String(upd.getHours()).padStart(2, "0")}:${String(upd.getMinutes()).padStart(2, "0")} 기준` : "";
@@ -249,7 +289,23 @@ function filtered() {
 
 function syncControls() {
   document.querySelectorAll("#market button").forEach((b) => b.setAttribute("aria-pressed", b.dataset.v === F.market));
-  try { localStorage.setItem("pension-market", F.market); } catch (e) {}
+  $("#fbtn").classList.toggle("custom", !isDefault());
+  $("#reset").hidden = isDefault();
+  document.querySelectorAll(".fcard .seg").forEach((g) => g.querySelectorAll("button").forEach((b) =>
+    b.setAttribute("aria-pressed", String(F[g.dataset.f]) === b.dataset.v)));
+  document.querySelectorAll(".fcard .switch").forEach((c) => { c.checked = !!F[c.dataset.f]; });
+  try { localStorage.setItem("pension-filter", JSON.stringify(F)); } catch (e) {}
+}
+
+function renderStats() {
+  const key = `a${F.amount}_s${F.silence}_r${+F.scale}_d${+F.two_day}_p${+F.pref}`;
+  const s = STATS && STATS.stats[key];
+  $("#stats").hidden = !(s && s.x20); if (!s || !s.x20) return;
+  const pct = (v) => `${v > 0 ? "+" : ""}${v.toFixed(1)}%`;
+  const base = STATS.baseline && STATS.baseline.x20 ? STATS.baseline.x20.mean : null;
+  const more = `지난 2년 기준이에요. 다음 날 시가에 사서 한 달(20거래일) 뒤 같은 시장·비슷한 시총 종목과 비교한 중간값이에요. `
+    + `평균 ${pct(s.x20.mean)}${base != null ? ` (아무 종목이나 샀다면 ${pct(base)})` : ""}, 시장보다 오른 종목 ${s.x20.win}%.`;
+  $("#stats").innerHTML = `이 조건이면 주 <b>${s.per_week}건</b> · 한 달 뒤 시장보다 <b>${pct(s.x20.median)}</b>${info(more)}`;
 }
 
 const PAGE = 30;
@@ -261,8 +317,14 @@ function item(s) {
         <div class="name">${esc(s.name)}${s.source.startsWith("장중") || s.intraday ? `<span class="pill">장중</span>` : ""}${s.two_day ? `<span class="pill mute">이틀</span>` : ""}</div>
         <div class="sub">${esc(s.code)}${s.market ? ` · ${esc(s.market)}` : ""}</div>
       </div>
-      <div class="amt">${fmtEok(s.buy_eok)}</div>${CHEV}
+      <div class="amt">${fmtEok(s.buy_eok)}${chg(s)}</div>${CHEV}
     </button>`;
+}
+// 신호 다음 날 시가에 샀다면 지금까지 수익률 (이미 많이 올랐는지 보는 용도)
+function chg(s) {
+  const r = s.ret_pct;
+  if (r == null) return `<span class="chg">오늘 포착</span>`;
+  return `<span class="chg ${r > 0 ? "up" : r < 0 ? "down" : ""}">이후 ${r > 0 ? "+" : ""}${r.toFixed(1)}%</span>`;
 }
 function more() {
   const box = $("#list .list"); if (!box || SHOWN >= LIST.length) return;
@@ -273,12 +335,13 @@ function more() {
 const io = new IntersectionObserver((es) => { if (es.some((e) => e.isIntersecting)) more(); }, { rootMargin: "400px" });
 
 function render() {
+  renderStats();
   const q = $("#q").value.trim().toLowerCase();
   const list = filtered().filter((s) => !q || s.name.toLowerCase().includes(q) || s.code.includes(q));
   $("#meta").textContent = `${list.length}건${UPDATED}`;
   if (!list.length) {
     $("#list").innerHTML = `<div class="empty">${!SIGNALS.length ? "아직 잡힌 종목이 없어요. 평일 오후 4시 10분에 업데이트돼요."
-      : q ? `‘${esc(q)}’에 맞는 종목이 없어요. 종목명이나 코드를 다시 확인해 주세요.` : `${F.market}에서 잡힌 종목이 아직 없어요. 전체를 눌러 보세요.`}</div>`;
+      : q ? `‘${esc(q)}’에 맞는 종목이 없어요. 종목명이나 코드를 다시 확인해 주세요.` : "이 조건에 맞는 종목이 없어요. 필터를 넓혀 보세요."}</div>`;
     return;
   }
   LIST = list; SHOWN = 0;
@@ -291,6 +354,18 @@ $("#market").addEventListener("click", (e) => {
   const b = e.target.closest("button"); if (!b) return;
   F.market = b.dataset.v; syncControls(); render();
 });
+$("#fbtn").addEventListener("click", () => {
+  const open = $("#fcard").classList.toggle("open");
+  $("#fbtn").setAttribute("aria-expanded", open);
+});
+document.querySelectorAll(".fcard .seg").forEach((g) => g.addEventListener("click", (e) => {
+  const b = e.target.closest("button"); if (!b) return;
+  F[g.dataset.f] = +b.dataset.v; syncControls(); render();
+}));
+document.querySelectorAll(".fcard .switch").forEach((c) => c.addEventListener("change", () => {
+  F[c.dataset.f] = c.checked; syncControls(); render();
+}));
+$("#reset").addEventListener("click", () => { F = { ...F, ...RULE }; syncControls(); render(); });
 $("#q").addEventListener("input", render);
 $("#list").addEventListener("click", (e) => { const b = e.target.closest(".item"); if (b) open(b.dataset.key, b); });
 
