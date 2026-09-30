@@ -66,7 +66,9 @@ def replace_confirmed(start: str, end: str, signals: List[dict]) -> None:
         prev = data.get(key, {})
         if prev.get("source", "").startswith("장중"):
             s = {**s, "intraday": prev.get("first_seen", prev["source"])}
-        data[key] = {**prev, **s, "updated_at": now}
+        new = {**prev, **s}
+        # 값이 그대로면 갱신 시각도 그대로 둔다 (하루 여러 번 도는 일배치가 빈 커밋·배포를 만들지 않게)
+        data[key] = {**new, "updated_at": prev.get("updated_at", now) if new == prev else now}
     save(data)
 
 

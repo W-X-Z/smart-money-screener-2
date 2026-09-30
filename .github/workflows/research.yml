@@ -62,8 +62,12 @@ jobs:
           git add research/archive
           if git diff --cached --quiet; then echo "변경 없음"; exit 0; fi
           git commit -m "연구용 아카이브 $FROM~$TO"
-          git pull --rebase
-          git push
+          # GitHub 이 가끔 500 으로 푸시를 거절해서 몇 번 다시 시도한다
+          for i in 1 2 3 4; do
+            git pull --rebase && git push && exit 0
+            sleep $((i * 10))
+          done
+          exit 1
         env:
           FROM: ${{ inputs.from }}
           TO: ${{ inputs.to }}

@@ -320,10 +320,11 @@ function item(s) {
       <div class="amt">${fmtEok(s.buy_eok)}${chg(s)}</div>${CHEV}
     </button>`;
 }
+const todayKST = () => new Date(Date.now() + 9 * 3600e3).toISOString().slice(0, 10).replace(/-/g, "");
 // 신호 다음 날 시가에 샀다면 지금까지 수익률 (이미 많이 올랐는지 보는 용도)
 function chg(s) {
   const r = s.ret_pct;
-  if (r == null) return `<span class="chg">오늘 포착</span>`;
+  if (r == null) return `<span class="chg">${s.date === todayKST() ? "오늘 포착" : "장 마감 후 계산"}</span>`;
   return `<span class="chg ${r > 0 ? "up" : r < 0 ? "down" : ""}">이후 ${r > 0 ? "+" : ""}${r.toFixed(1)}%</span>`;
 }
 function more() {
