@@ -215,6 +215,68 @@ def pre_rules(x: Ctx, ev: pd.DataFrame, hold: int = 20) -> List[dict]:
     return out
 
 
+# ------------------------------------------------------------------ E. 선별 기준
+
+def features(x: Ctx, ev: pd.DataFrame) -> pd.DataFrame:
+    """신호일 종가까지 알 수 있는 값만 쓴다."""
+    p, a, net = x.p, x.a, x.p.net
+    t, c = ev.t.values, ev.c.values
+    adj = x.adj
+    def past(arr, L, how):
+        out = []
+        for ti, ci in zip(t, c):
+            w = arr[max(0, ti - L + 1):ti + 1, ci]
+            w = w[~np.isnan(w)]
+            out.append(how(w) if len(w) else np.nan)
+        return np.array(out)
+    r = np.where(np.isnan(p.fluc), np.nan, p.fluc / 100)
+    with np.errstate(invalid="ignore", divide="ignore"):
+        f = pd.DataFrame({
+            "거래대금 급증(신호일/20일 평균)": p.trdval[t, c] / a["adv20"][t, c],
+            "거래대금 대비 매수 %": a["adv_pct"][t, c],
+            "매수 금액": a["amount"][t, c],
+            "시가총액": p.mcap[t, c],
+            "52주 고가 근접도": adj[t, c] / past(adj, 250, np.max),
+            "60일 변동성": past(r, 60, np.std),
+            "신호 전 20일 수익률": ev.pre20.values,
+            "신호일 등락률": ev.fluc0.values,
+            # 지난 1년(최근 20일 제외) 연기금 누적 순매수 / 시총: 0 근처면 '새 종목'
+            "지난 1년 연기금 보유 흔적": np.array([np.nansum(net[max(0, ti - 250):max(0, ti - 20), ci])
+                                          for ti, ci in zip(t, c)]) / p.mcap[t, c],
+        })
+    return f
+
+
+def selection(x: Ctx, ev: pd.DataFrame, hold: int = 20) -> str:
+    res = [trade(x, t, c, t + 1, t + hold) for t, c in zip(ev.t, ev.c)]
+    d = ev.assign(ex=[r[1] if r else np.nan for r in res]).reset_index(drop=True)
+    f = features(x, ev).reset_index(drop=True)
+    d = pd.concat([d, f], axis=1).dropna(subset=["ex"])
+    d["코스닥"] = (x.p.market[d.c.values] == "KSQ").astype(float)
+    rows = []
+    for col in list(f.columns) + ["코스닥"]:
+        row = {"기준": col}
+        signs = []
+        for part in ("과거 1년", "최근 1년"):
+            g = d[d.part == part].dropna(subset=[col])
+            if col == "코스닥":
+                hi, lo = g[g[col] == 1], g[g[col] == 0]
+            else:
+                med = g[col].median()
+                hi, lo = g[g[col] > med], g[g[col] <= med]
+            diff_med = hi.ex.median() - lo.ex.median()
+            diff_mean = hi.ex.mean() - lo.ex.mean()
+            big = (hi.ex >= 30).mean() * 100 - (lo.ex >= 30).mean() * 100
+            row[f"{part} 중앙 차"] = round(diff_med, 1)
+            row[f"{part} 평균 차"] = round(diff_mean, 1)
+            row[f"{part} +30%↑ 비율 차"] = round(big, 1)
+            signs.append(np.sign(diff_med) == np.sign(diff_mean) and np.sign(diff_med))
+        row["두 해 같은 방향"] = "예" if signs[0] and signs[0] == signs[1] else ""
+        rows.append(row)
+    return ("값이 큰 쪽(코스닥은 코스닥 쪽) 절반에서 작은 쪽 절반을 뺀 20일 초과수익 차이(%p). "
+            "'두 해 같은 방향'은 중앙·평균 차가 두 해 모두 같은 부호일 때.\n\n" + table(rows))
+
+
 # ------------------------------------------------------------------ D. 포트폴리오
 
 def index_returns(x: Ctx) -> Dict[str, np.ndarray]:
@@ -353,6 +415,14 @@ SUMMARY = """## 결론 (2026-10-10)
 - 연기금은 신호 뒤에도 계속 산다 (5일 안에 65%가 추가 매수, 신호 금액의 0.4배). 하지만 확인 후 들어가면 초반 상승을 놓쳐 오히려 나쁘다.
 - 40·60일 보유와 추세 필터는 과거·최근 결과가 정반대 (예: 60일·20종목 샤프 2.1 → 0.45). 과거 1년만 보고 골랐다면 실패했을 규칙이라 버린다.
 
+**선별 (E)**
+- 거래대금 급증, 매수 금액, 거래대금 대비 매수 비율, 시총, 52주 고가 근접도, 변동성, 신호 전 수익률, 신호일 등락,
+  지난 1년 연기금 보유 흔적 9가지 모두 과거 1년과 최근 1년에서 효과 방향이 반대였다. 최근 1년은 많이 오르고 변동성 큰 종목이,
+  과거 1년은 그 반대가 나았다 (장세 의존).
+- 두 해 모두 같은 방향은 '코스닥' 하나뿐이고 차이도 작다 (중앙값 +0.3%p / +7.3%p). 자리가 모자랄 때 동점 처리용 정도로만 쓴다.
+- 무작위로 신호 절반만 10종목으로 운용하면 최근 1년 연수익률이 2%~65%(10~90% 구간)로 흩어진다. 적게 고를수록 운에 좌우된다.
+- 진짜 선별력은 지금 데이터(연기금 수급·시세) 밖에서 찾아야 한다: 증권사 리포트, 자사주 취득 공시, 다른 기관 동반 매수.
+
 **주의**
 - 최근 1년은 대형주만 오른 장(시총가중 +81%, 동일가중 -1%)이라 절대 수익은 대형주 지수보다 낮다. 이 전략은 '중소형주 안에서의 초과수익'이다.
 - 시장 전체가 빠지면 같이 빠진다 (최근 1년 최대낙폭 -31%). 낙폭을 더 줄이려면 코스닥150 선물·인버스로 베타를 헤지하는 방법이 있다 (미검증).
@@ -373,6 +443,7 @@ def main() -> None:
         ("B. 보유 기간·청산 규칙", table(hold_rules(x, ev))),
         ("C. 신호 전 흐름·금액별 (20일 보유)", table(pre_rules(x, ev))),
         ("D. 포트폴리오 백테스트 (왕복 비용 0.3%)", backtests(x, ev)),
+        ("E. 선별 기준 (20일 보유, 값 기준 위·아래 절반 비교)", selection(x, ev)),
     ]
     for title, body in sections:
         print(f"\n## {title}\n{body}")
