@@ -13,6 +13,10 @@ on:
         description: "최대 수집 시간(분). 넘으면 저장 후 종료, 재실행 시 이어서 수집"
         required: false
         default: "50"
+      extra:
+        description: "y 면 업종·PER/PBR 월말 스냅숏 수집 (research.collect_extra)"
+        required: false
+        default: ""
       investors:
         description: "연기금 외 투자자 코드 (쉼표 구분, 예: 3100,3000). 비우면 연기금·시세 수집"
         required: false
@@ -44,10 +48,13 @@ jobs:
           TO: ${{ inputs.to }}
           MAX_MINUTES: ${{ inputs.max_minutes }}
           INVESTORS: ${{ inputs.investors }}
+          EXTRA: ${{ inputs.extra }}
         run: |
           [[ "$FROM" =~ ^[0-9]{8}$ && "$TO" =~ ^[0-9]{8}$ ]] || { echo "잘못된 날짜"; exit 1; }
           [[ "$MAX_MINUTES" =~ ^[0-9]+$ ]] || MAX_MINUTES=50
-          if [[ -n "$INVESTORS" ]]; then
+          if [[ "$EXTRA" == "y" ]]; then
+            python -m research.collect_extra --from "$FROM" --to "$TO"
+          elif [[ -n "$INVESTORS" ]]; then
             [[ "$INVESTORS" =~ ^[0-9]{4}(,[0-9]{4})*$ ]] || { echo "잘못된 투자자 코드"; exit 1; }
             python -m research.collect --from "$FROM" --to "$TO" --max-minutes "$MAX_MINUTES" --investors "$INVESTORS"
           else
