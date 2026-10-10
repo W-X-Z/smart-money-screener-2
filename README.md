@@ -29,7 +29,7 @@ DB 는 없습니다. 원천 데이터(`research/archive`)와 웹 데이터(`publ
 - **웹 표시**: 시장 탭(전체/코스피/코스닥) + 상세 필터. 기본값은 추천 규칙(3억·침묵 0일·규모 대비)이고 필터 패널의 "기본값으로"로 되돌린다. 목록에는 매수 금액 아래 신호 이후 수익률(다음 날 시가 기준)을 함께 보여준다.
 - 필터 조합 72개의 과거 2년 성과(`public/data/filter_stats.json`)를 웹에 함께 보여준다.
 
-검증 결과: `research/results/REPORT.md`
+검증 결과: `research/results/REPORT.md` (신호 규칙), `research/results/STRATEGY.md` (진입·보유·포트폴리오 운용)
 
 ## Mac 설치와 장중 스캔
 
