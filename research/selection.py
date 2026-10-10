@@ -20,6 +20,19 @@ from research.evaluate import RESULTS
 from research.strategy import build, events, portfolio, table, trade
 
 HOLD = 20
+
+SUMMARY = """
+## 결론 (2026-10-10)
+
+- **외국인 동반 매수** (신호 전 5일 외국인 순매수가 시총 대비 과거 1년 중앙값 이상)가 가장 유망하다.
+  10종목 운용 시 과거 1년 연 65%·낙폭 -8%·샤프 2.4, 최근 1년 연 45%·낙폭 -19%·샤프 1.3
+  (전체 신호 48%·-17%·1.6 / 29%·-35%·0.8). 무작위로 절반 고른 경우보다 두 해 모두 위(82·89 백분위)지만
+  20개 가까운 기준을 시험한 만큼 우연을 배제할 수준(95 이상)은 아니다. 앞으로 실제 신호로 계속 확인해야 한다.
+- **업종 연기금 동반 매수** (같은 업종 종목 중 최근 5일 연기금 순매수 종목 비율이 높음)도 두 해 같은 방향이지만 더 약하다 (68·77 백분위).
+- 테마 동료(수익률 상관 상위 20종목)의 연기금 동반 매수도 약하게 같은 방향. 기준을 여러 개 겹치면 신호가 너무 적어져 나빠진다.
+- 업종·테마의 신호 전 흐름(모멘텀), PBR·PER·적자 여부·배당수익률, 신호일 외국인·연기금 외 기관 순매수는 두 해 방향이 엇갈려 쓰지 않는다.
+- 뉴스·정책은 과거 이력을 구할 수 없어 검증하지 못했다. 대리 지표(거래대금 급증, 업종 모멘텀)는 두 해 엇갈렸다.
+"""
 PEERS = 20
 EOK = 1e8
 
@@ -186,6 +199,28 @@ def select_backtest(x, d: pd.DataFrame, rules: dict) -> str:
     return table(rows)
 
 
+def random_check(x, d: pd.DataFrame, rules: dict, sims: int = 200) -> str:
+    """같은 수(약 절반)의 신호를 무작위로 골랐을 때 샤프 분포와 비교. 20개 가까운 기준을 시험했으므로
+    '두 해 같은 방향'만으로는 우연일 수 있다. 두 해 모두 무작위보다 확실히 위(95% 이상)여야 믿을 만하다."""
+    first, split, end = int(d.t.min()), x.split_t, len(x.p.dates)
+    spans = (("과거 1년", first, split), ("최근 1년", split, end))
+    rng = np.random.default_rng(5)
+    rand = {p: [] for p, *_ in spans}
+    for _ in range(sims):
+        m = rng.random(len(d)) < 0.5
+        for p, a, b in spans:
+            rand[p].append(portfolio(x, d[m], 10, HOLD, a, b)["샤프"])
+    rows = []
+    for name, m in rules.items():
+        for p, a, b in spans:
+            r = portfolio(x, d[m], 10, HOLD, a, b)
+            rows.append({"선별": name, "구간": p, "신호": int(((d[m].t >= a - 1) & (d[m].t < b)).sum()),
+                         "연수익률%": r["연수익률%"], "최대낙폭%": r["최대낙폭%"], "샤프": r["샤프"],
+                         "무작위 절반 샤프 중앙": round(float(np.median(rand[p])), 2),
+                         "무작위 대비 백분위": round(float((np.array(rand[p]) < r["샤프"]).mean() * 100))})
+    return table(rows)
+
+
 def main() -> None:
     x = build()
     ev = events(x).reset_index(drop=True)
@@ -221,6 +256,17 @@ def main() -> None:
     body = select_backtest(x, d, rules)
     print(body)
     parts.append("\n## 선별 포트폴리오 (기준값은 과거 1년 중앙값, 20일 보유, 왕복 비용 0.3%)\n\n" + body)
+    prior = d[d.part == "과거 1년"]
+    F, Sx = "외국인 최근 5일 순매수(시총 대비 bp)", "업종 내 최근 5일 연기금 순매수 비율"
+    if F in d and Sx in d:
+        hi = {c: (d[c] > prior[c].median()).values for c in (F, Sx)}
+        check = {"외국인 5일 동반 매수": hi[F], "업종 연기금 동반 매수": hi[Sx], "둘 다": hi[F] & hi[Sx]}
+        body = random_check(x, d, check)
+        print(body)
+        parts.append("\n## 무작위 선별과 비교 (10종목, 무작위 절반 200회)\n\n"
+                     f"기준값: 외국인 최근 5일 순매수 > 시총의 {prior[F].median():.1f}bp, "
+                     f"업종 내 연기금 순매수 종목 비율 > {prior[Sx].median():.0f}%\n\n" + body)
+    parts.insert(1, SUMMARY)
     RESULTS.mkdir(exist_ok=True)
     (RESULTS / "SELECTION.md").write_text("".join(parts))
     d.to_csv(RESULTS / "selection_features.csv", index=False, encoding="utf-8-sig")
