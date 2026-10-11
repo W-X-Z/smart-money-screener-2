@@ -14,5 +14,5 @@
       ]
     }
   ],
-  "ignoreCommand": "if [ -n \"$VERCEL_GIT_PREVIOUS_SHA\" ]; then git diff --quiet \"$VERCEL_GIT_PREVIOUS_SHA\" HEAD -- public/ vercel.json; else git diff --quiet HEAD^ HEAD -- public/ vercel.json; fi"
+  "ignoreCommand": "git cat-file -e \"${VERCEL_GIT_PREVIOUS_SHA:-none}^{commit}\" 2>/dev/null && git diff --quiet \"$VERCEL_GIT_PREVIOUS_SHA\" HEAD -- public/ vercel.json && exit 0; exit 1"
 }
