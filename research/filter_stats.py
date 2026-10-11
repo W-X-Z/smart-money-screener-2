@@ -48,7 +48,7 @@ def main() -> None:
         m = S.mask(a, amount, silence, scale, two_day, pref)
         m[:START] = False
         t, c = np.nonzero(m)
-        k = S.cooldown(t, c)
+        k = S.cooldown(t, c, a["amount"][t, c])
         t, c = t[k], c[k]
         x20 = f.fwd[("T+1시가", 20)][t, c]
         x40 = f.fwd[("T+1시가", 40)][t, c]

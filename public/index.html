@@ -277,12 +277,15 @@ const passes = (s) => s.buy_eok >= F.amount && (s.big_days ?? 0) <= F.silence
   && (!F.scale || s.buy_eok >= 5 || (s.adv_pct ?? 0) >= 5)
   && (F.two_day || !s.two_day) && (F.pref || !s.pref) && (!F.market || s.market === F.market);
 
+// 같은 종목은 20거래일 안에서 가장 크게 산 날 한 줄만 보여준다 (engine/signals.py cooldown 과 같은 규칙).
+// 더 큰 신호가 오면 그 날로 바꾸고 기간도 거기서 다시 센다. 금액 하한을 낮춰도 큰 매수가 작은 신호에 가려지지 않게.
 function filtered() {
   const asc = SIGNALS.filter(passes).sort((a, b) => a.date.localeCompare(b.date));
   const last = {}, out = [];
   for (const s of asc) {
-    const t = s.tix ?? 0;
-    if (last[s.code] == null || t - last[s.code] >= COOLDOWN) { out.push(s); last[s.code] = t; }
+    const t = s.tix ?? 0, prev = last[s.code];
+    if (prev == null || t - prev.t >= COOLDOWN) { out.push(s); last[s.code] = { t, i: out.length - 1 }; }
+    else if (s.buy_eok > out[prev.i].buy_eok) { out[prev.i] = s; last[s.code] = { t, i: prev.i }; }
   }
   return out.reverse();
 }

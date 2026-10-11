@@ -91,12 +91,18 @@ def key(amount, silence, scale, two_day, pref) -> str:
     return f"a{amount}_s{silence}_r{int(scale)}_d{int(two_day)}_p{int(pref)}"
 
 
-def cooldown(t: np.ndarray, c: np.ndarray) -> np.ndarray:
-    """같은 종목의 COOLDOWN 거래일 안 재신호를 뺀 인덱스 (t 오름차순 가정 없이)."""
+def cooldown(t: np.ndarray, c: np.ndarray, amount: np.ndarray = None) -> np.ndarray:
+    """같은 종목의 COOLDOWN 거래일 안 재신호를 뺀 인덱스 (t 오름차순 가정 없이).
+    amount 를 주면 20거래일 안에서 가장 크게 산 신호 하나를 남긴다 (더 큰 신호가 오면 그 날로 바꾸고 기간도 거기서 다시 센다).
+    이렇게 해야 금액 하한을 낮췄을 때 높은 하한에서 보이던 신호가 작은 신호에 가려지지 않는다."""
     order = np.lexsort((t, c))
     keep, last = [], {}
     for i in order:
-        if t[i] - last.get(c[i], -10**9) >= COOLDOWN:
+        prev = last.get(c[i])
+        if prev is None or t[i] - prev[0] >= COOLDOWN:
             keep.append(i)
-            last[c[i]] = t[i]
+            last[c[i]] = (t[i], len(keep) - 1)
+        elif amount is not None and amount[i] > amount[keep[prev[1]]]:
+            keep[prev[1]] = i
+            last[c[i]] = (t[i], prev[1])
     return np.array(sorted(keep, key=lambda i: t[i]), dtype=int)
